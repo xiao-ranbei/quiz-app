@@ -11,7 +11,7 @@ export default function Profile() {
   const [stats, setStats] = useState<{ totalAnswered: number; correct: number; wrongCount: number; examCount: number } | null>(null);
   const [sessions, setSessions] = useState<ExamSession[]>([]);
   const [aiCfg, setAiCfg] = useState<AIConfig>({ api_base_url: '', api_key: '', model: '' });
-  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message?: string; error?: string } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -131,7 +131,7 @@ export default function Profile() {
           {msg && <span className="text-sm text-emerald-300 ml-3">{msg}</span>}
           {testResult && (
             <span className={`text-sm ml-3 ${testResult.ok ? 'text-emerald-300' : 'text-rose-300'}`}>
-              {testResult.msg}
+              {testResult.message || testResult.error || (testResult.ok ? '连接成功' : '失败')}
             </span>
           )}
         </div>

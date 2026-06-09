@@ -42,11 +42,11 @@ export default function SubmitQuestion() {
   const [aiQuestions, setAiQuestions] = useState<AIQuestion[]>([]);
   const [bulkJson, setBulkJson] = useState('');
 
-  const hasAIConfig = useState<boolean>(false);
+  const [hasAIConfig] = useState<boolean>(false);
   const [aiCfg, setAiCfg] = useState<{ url: string; key: string; model: string }>({
     url: '', key: '', model: '',
   });
-  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message?: string; error?: string } | null>(null);
 
   useEffect(() => {
     getCategories().then(setCategories);
@@ -255,7 +255,7 @@ export default function SubmitQuestion() {
 
   const handleTestAI = async () => {
     if (!aiCfg.url || !aiCfg.key || !aiCfg.model) {
-      setTestResult({ ok: false, msg: '请填写完整的 API 配置' });
+      setTestResult({ ok: false, message: '请填写完整的 API 配置' });
       return;
     }
     const res = await testAIConnection({ api_base_url: aiCfg.url, api_key: aiCfg.key, model: aiCfg.model });
@@ -529,7 +529,7 @@ export default function SubmitQuestion() {
                 <span
                   className={`text-sm ${testResult.ok ? 'text-emerald-300' : 'text-rose-300'}`}
                 >
-                  {testResult.msg}
+                  {testResult.message || testResult.error || (testResult.ok ? '连接成功' : '失败')}
                 </span>
               )}
             </div>

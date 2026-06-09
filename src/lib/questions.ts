@@ -199,7 +199,7 @@ export async function getWrongBook(userId: string, includeQuestion = true): Prom
     .eq('user_id', userId)
     .order('last_wrong_at', { ascending: false });
   if (error) throw error;
-  return data as WrongBookItem[];
+  return (data ?? []) as unknown as WrongBookItem[];
 }
 
 export async function toggleWrongBookMastered(id: string, mastered: boolean): Promise<void> {
