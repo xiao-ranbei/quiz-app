@@ -34,16 +34,19 @@ export async function getQuestions(params: {
   if (params.keyword) query = query.ilike('question', `%${params.keyword}%`);
 
   if (params.random) {
-    query = query.order('random()');
+    // PostgREST 不支持 order('random()')，改为前端打乱
   } else {
     query = query.order('created_at', { ascending: false });
   }
 
-  if (params.limit) query = query.limit(params.limit);
-
   const { data, error } = await query;
   if (error) throw error;
-  return data ?? [];
+  let result = data ?? [];
+  if (params.random) {
+    result = result.sort(() => Math.random() - 0.5);
+  }
+  if (params.limit) result = result.slice(0, params.limit);
+  return result;
 }
 
 export async function getQuestionCount(params: {
