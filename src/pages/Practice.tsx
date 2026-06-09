@@ -47,6 +47,7 @@ export default function Practice() {
     setErrorMsg('');
     setLoading(true);
     try {
+      console.log('[Practice] 开始加载题目, categoryId:', categoryId, 'difficulty:', difficulty, 'type:', type, 'count:', count);
       const qs = await getQuestions({
         categoryId: categoryId || undefined,
         difficulty: difficulty || undefined,
@@ -55,6 +56,7 @@ export default function Practice() {
         limit: count,
         random: true,
       });
+      console.log('[Practice] 获取到题目数量:', qs.length);
       if (qs.length === 0) {
         setErrorMsg('没有符合条件的题目，请调整筛选条件');
         return;
@@ -63,6 +65,10 @@ export default function Practice() {
       start(qs);
       setCurrentAnswer('');
       setStarted(true);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[Practice] 加载题目失败:', e);
+      setErrorMsg('加载失败: ' + msg);
     } finally {
       setLoading(false);
     }
