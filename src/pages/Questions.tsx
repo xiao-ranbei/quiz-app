@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DIFFICULTY_LABEL, TYPE_LABEL } from '../types';
 import type { Category, Difficulty, Question, QuestionType } from '../types';
-import { getCategories, getQuestions } from '../lib/questions';
+import { getCategories, getQuestions, deleteQuestion, isCurrentUserAdmin } from '../lib/questions';
 import CategoryFilter from '../components/CategoryFilter';
 import Loading from '../components/Loading';
 import EmptyState from '../components/EmptyState';
@@ -15,9 +15,13 @@ export default function Questions() {
   const [categoryId, setCategoryId] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty | ''>('');
   const [type, setType] = useState<QuestionType | ''>('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     getCategories().then(setCategories);
+    isCurrentUserAdmin().then(setIsAdmin);
   }, []);
 
   useEffect(() => {
@@ -31,6 +35,22 @@ export default function Questions() {
       .then(setQuestions)
       .finally(() => setLoading(false));
   }, [categoryId, difficulty, type, keyword]);
+
+  const handleDelete = async (id: string) => {
+    if (!isAdmin) return;
+    if (!confirm('确定删除该题目吗？此操作无法撤销。')) return;
+    setDeletingId(id);
+    setMsg(null);
+    try {
+      await deleteQuestion(id);
+      setQuestions((qs) => qs.filter((q) => q.id !== id));
+      setMsg({ ok: true, text: '题目已删除' });
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : '删除失败' });
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const catMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -52,6 +72,18 @@ export default function Questions() {
           开始练习
         </Link>
       </div>
+
+      {msg && (
+        <div
+          className={`mb-4 text-sm rounded-md p-3 border ${
+            msg.ok
+              ? 'border-emerald-600/60 bg-emerald-900/30 text-emerald-200'
+              : 'border-rose-600/60 bg-rose-900/30 text-rose-200'
+          }`}
+        >
+          {msg.text}
+        </div>
+      )}
 
       <CategoryFilter
         categories={categories}
@@ -76,28 +108,41 @@ export default function Questions() {
               key={q.id}
               className="rounded-lg bg-theme-card border border-theme p-4 hover:border-theme-muted transition-colors"
             >
-              <div className="flex flex-wrap items-center gap-2 text-xs text-theme-muted mb-2">
-                <span className="px-2 py-0.5 rounded bg-theme-input text-theme-secondary">
-                  {TYPE_LABEL[q.type]}
-                </span>
-                <span className="px-2 py-0.5 rounded bg-theme-input text-theme-secondary">
-                  {DIFFICULTY_LABEL[q.difficulty]}
-                </span>
-                {q.category_id && catMap.has(q.category_id) && (
-                  <span className="px-2 py-0.5 rounded bg-brand-900/60 text-brand-200 border border-brand-800">
-                    {catMap.get(q.category_id)}
-                  </span>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-theme-muted mb-2">
+                    <span className="px-2 py-0.5 rounded bg-theme-input text-theme-secondary">
+                      {TYPE_LABEL[q.type]}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-theme-input text-theme-secondary">
+                      {DIFFICULTY_LABEL[q.difficulty]}
+                    </span>
+                    {q.category_id && catMap.has(q.category_id) && (
+                      <span className="px-2 py-0.5 rounded bg-brand-900/60 text-brand-200 border border-brand-800">
+                        {catMap.get(q.category_id)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-theme-primary leading-relaxed whitespace-pre-wrap">
+                    {q.question}
+                  </div>
+                  <div className="mt-3 text-sm text-theme-muted">
+                    答案：<span className="text-emerald-300">{q.answer}</span>
+                  </div>
+                  {q.explanation && (
+                    <div className="mt-2 text-sm text-theme-muted">解析：{q.explanation}</div>
+                  )}
+                </div>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDelete(q.id)}
+                    disabled={deletingId === q.id}
+                    className="shrink-0 px-3 py-1.5 text-xs rounded-md bg-rose-600/80 hover:bg-rose-600 text-white disabled:opacity-50"
+                  >
+                    {deletingId === q.id ? '删除中...' : '删除'}
+                  </button>
                 )}
               </div>
-              <div className="text-theme-primary leading-relaxed whitespace-pre-wrap">
-                {q.question}
-              </div>
-              <div className="mt-3 text-sm text-theme-muted">
-                答案：<span className="text-emerald-300">{q.answer}</span>
-              </div>
-              {q.explanation && (
-                <div className="mt-2 text-sm text-theme-muted">解析：{q.explanation}</div>
-              )}
             </div>
           ))}
         </div>

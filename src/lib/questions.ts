@@ -223,3 +223,24 @@ export async function getExamSessions(userId: string): Promise<ExamSession[]> {
   if (error) throw error;
   return data as ExamSession[];
 }
+
+// 管理员邮箱列表 - 只有这些邮箱可以删除题目
+const ADMIN_EMAILS = new Set(['xiao_ranbei@outlook.com']);
+
+/**
+ * 判断当前登录用户是否为管理员
+ */
+export async function isCurrentUserAdmin(): Promise<boolean> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) return false;
+  const email = data.user.email?.toLowerCase() ?? '';
+  return ADMIN_EMAILS.has(email);
+}
+
+/**
+ * 删除题目（仅管理员可操作，Supabase RLS 会二次校验）
+ */
+export async function deleteQuestion(id: string): Promise<void> {
+  const { error } = await supabase.from('questions').delete().eq('id', id);
+  if (error) throw error;
+}

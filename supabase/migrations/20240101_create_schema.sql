@@ -119,11 +119,14 @@ alter table user_ai_configs enable row level security;
 drop policy if exists "categories are viewable by everyone" on categories;
 create policy "categories are viewable by everyone" on categories for select using (true);
 
--- questions: 所有人可读；登录用户可插入
+-- questions: 所有人可读；登录用户可插入；管理员邮箱可删除
 drop policy if exists "questions are viewable by everyone" on questions;
 create policy "questions are viewable by everyone" on questions for select using (true);
 drop policy if exists "authenticated users can insert questions" on questions;
 create policy "authenticated users can insert questions" on questions for insert to authenticated with check (true);
+drop policy if exists "admin users can delete questions" on questions;
+create policy "admin users can delete questions" on questions for delete to authenticated
+  using (auth.jwt() ->> 'email' = 'xiao_ranbei@outlook.com');
 
 -- profiles: 本人可读写
 drop policy if exists "user can view own profile" on profiles;
