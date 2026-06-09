@@ -27,8 +27,8 @@ export default function Login() {
           password: data.password,
         });
         if (error) throw error;
-        setMsg({ ok: true, text: '注册成功，已自动登录。' });
-        setTimeout(() => navigate('/'), 800);
+        setMsg({ ok: true, text: '注册成功，正在进入...' });
+        setTimeout(() => navigate('/'), 600);
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: data.email,
@@ -38,10 +38,15 @@ export default function Login() {
         navigate('/');
       }
     } catch (e) {
-      setMsg({
-        ok: false,
-        text: e instanceof Error ? e.message : '操作失败',
-      });
+      let text = e instanceof Error ? e.message : '操作失败';
+      if (/invalid.*credentials/i.test(text) || /invalid login/i.test(text)) {
+        text = '邮箱或密码错误，请重试。';
+      } else if (/weak/i.test(text)) {
+        text = '密码太弱，请使用至少 6 位字符。';
+      } else if (/already registered/i.test(text) || /already exists/i.test(text)) {
+        text = '该邮箱已被注册，请直接登录。';
+      }
+      setMsg({ ok: false, text });
     } finally {
       setLoading(false);
     }
