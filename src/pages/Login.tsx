@@ -54,11 +54,11 @@ export default function Login() {
 
   return (
     <div className="py-16 max-w-md mx-auto">
-      <div className="rounded-2xl bg-slate-800/40 border border-slate-700 p-8">
-        <h1 className="text-2xl font-bold text-slate-100 text-center mb-1">
+      <div className="rounded-2xl bg-theme-card border border-theme p-8">
+        <h1 className="text-2xl font-bold text-theme-primary text-center mb-1">
           {mode === 'signin' ? '登录' : '注册'}
         </h1>
-        <p className="text-sm text-slate-400 text-center mb-6">刷题平台</p>
+        <p className="text-sm text-theme-muted text-center mb-6">刷题平台</p>
 
         <div className="flex gap-2 mb-5">
           <button
@@ -67,7 +67,7 @@ export default function Login() {
             className={`flex-1 px-4 py-2 text-sm rounded-md border ${
               mode === 'signin'
                 ? 'bg-brand-600 text-white border-brand-500'
-                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                : 'bg-theme-card text-theme-secondary border-theme hover-theme'
             }`}
           >
             登录
@@ -78,7 +78,7 @@ export default function Login() {
             className={`flex-1 px-4 py-2 text-sm rounded-md border ${
               mode === 'signup'
                 ? 'bg-brand-600 text-white border-brand-500'
-                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                : 'bg-theme-card text-theme-secondary border-theme hover-theme'
             }`}
           >
             注册
@@ -87,22 +87,22 @@ export default function Login() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-sm text-slate-300 mb-1">邮箱</label>
+            <label className="block text-sm text-theme-secondary mb-1">邮箱</label>
             <input
               type="email"
               {...register('email', { required: true })}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-slate-100 text-sm"
+              className="w-full px-3 py-2 bg-theme-input border border-theme rounded-md text-theme-primary text-sm"
             />
             {errors.email && (
               <div className="text-xs text-rose-400 mt-1">请填写邮箱</div>
             )}
           </div>
           <div>
-            <label className="block text-sm text-slate-300 mb-1">密码（至少 6 位）</label>
+            <label className="block text-sm text-theme-secondary mb-1">密码（至少 6 位）</label>
             <input
               type="password"
               {...register('password', { required: true, minLength: 6 })}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-slate-100 text-sm"
+              className="w-full px-3 py-2 bg-theme-input border border-theme rounded-md text-theme-primary text-sm"
             />
             {errors.password && (
               <div className="text-xs text-rose-400 mt-1">密码至少 6 位</div>

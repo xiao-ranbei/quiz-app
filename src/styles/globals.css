@@ -2,14 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
-  margin: 0;
-  padding: 0;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-}
+@layer base {
+  html {
+    @apply transition-colors duration-200;
+  }
 
-code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  html, body {
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+
+  /* 浅色主题变量 */
+  :root,
+  .light {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-input: #f8fafc;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --border-color: #e2e8f0;
+    --hover-bg: #f1f5f9;
+  }
+
+  /* 深色主题变量 */
+  .dark {
+    --bg-primary: #020617;
+    --bg-secondary: #0f172a;
+    --bg-card: #1e293b;
+    --bg-input: #0f172a;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
+    --border-color: #334155;
+    --hover-bg: #1e293b;
+  }
+
+  /* 通用主题色辅助类 */
+  .bg-theme { background-color: var(--bg-primary); }
+  .bg-theme-card { background-color: var(--bg-card); }
+  .bg-theme-input { background-color: var(--bg-input); }
+  .bg-theme-secondary { background-color: var(--bg-secondary); }
+  .bg-theme-hover { background-color: var(--hover-bg); }
+
+  .text-theme-primary { color: var(--text-primary); }
+  .text-theme-secondary { color: var(--text-secondary); }
+  .text-theme-muted { color: var(--text-muted); }
+
+  .border-theme { border-color: var(--border-color); }
+  .hover-theme:hover { background-color: var(--hover-bg); }
 }

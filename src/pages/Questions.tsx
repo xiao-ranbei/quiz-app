@@ -42,8 +42,8 @@ export default function Questions() {
     <div className="py-8">
       <div className="flex items-end justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-1">题库</h1>
-          <p className="text-sm text-slate-400">按分类和难度筛选，共 {questions.length} 题</p>
+          <h1 className="text-2xl font-bold text-theme-primary mb-1">题库</h1>
+          <p className="text-sm text-theme-muted">按分类和难度筛选，共 {questions.length} 题</p>
         </div>
         <Link
           to="/practice"
@@ -74,13 +74,13 @@ export default function Questions() {
           {questions.map((q) => (
             <div
               key={q.id}
-              className="rounded-lg bg-slate-800/60 border border-slate-700 p-4 hover:border-slate-600 transition-colors"
+              className="rounded-lg bg-theme-card border border-theme p-4 hover:border-theme-muted transition-colors"
             >
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mb-2">
-                <span className="px-2 py-0.5 rounded bg-slate-700 text-slate-200">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-theme-muted mb-2">
+                <span className="px-2 py-0.5 rounded bg-theme-input text-theme-secondary">
                   {TYPE_LABEL[q.type]}
                 </span>
-                <span className="px-2 py-0.5 rounded bg-slate-700 text-slate-200">
+                <span className="px-2 py-0.5 rounded bg-theme-input text-theme-secondary">
                   {DIFFICULTY_LABEL[q.difficulty]}
                 </span>
                 {q.category_id && catMap.has(q.category_id) && (
@@ -89,14 +89,14 @@ export default function Questions() {
                   </span>
                 )}
               </div>
-              <div className="text-slate-100 leading-relaxed whitespace-pre-wrap">
+              <div className="text-theme-primary leading-relaxed whitespace-pre-wrap">
                 {q.question}
               </div>
-              <div className="mt-3 text-sm text-slate-400">
+              <div className="mt-3 text-sm text-theme-muted">
                 答案：<span className="text-emerald-300">{q.answer}</span>
               </div>
               {q.explanation && (
-                <div className="mt-2 text-sm text-slate-400">解析：{q.explanation}</div>
+                <div className="mt-2 text-sm text-theme-muted">解析：{q.explanation}</div>
               )}
             </div>
           ))}
