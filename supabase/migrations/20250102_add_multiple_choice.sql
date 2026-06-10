@@ -1,4 +1,4 @@
--- === 新增多选题支持 ===
+-- === 新增多选题支持 + 分类管理权限 ===
 -- 执行方式：在 Supabase SQL Editor 中执行
 
 -- 放宽 questions.type 的 type 检查约束（如果表已存在
@@ -34,3 +34,12 @@ end $$;
 
 alter table user_history add constraint user_history_mode_check
   check (mode in ('practice', 'exam'));
+
+-- ===== 分类管理权限（管理员可增删）=====
+drop policy if exists "admin users can insert categories" on categories;
+create policy "admin users can insert categories" on categories for insert to authenticated
+  using (auth.jwt() ->> 'email' = 'xiao_ranbei@outlook.com');
+
+drop policy if exists "admin users can delete categories" on categories;
+create policy "admin users can delete categories" on categories for delete to authenticated
+  using (auth.jwt() ->> 'email' = 'xiao_ranbei@outlook.com');

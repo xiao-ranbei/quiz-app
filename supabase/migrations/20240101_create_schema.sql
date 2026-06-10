@@ -115,9 +115,15 @@ alter table wrong_book enable row level security;
 alter table exam_sessions enable row level security;
 alter table user_ai_configs enable row level security;
 
--- categories: 所有人可读
+-- categories: 所有人可读；管理员可增删
 drop policy if exists "categories are viewable by everyone" on categories;
 create policy "categories are viewable by everyone" on categories for select using (true);
+drop policy if exists "admin users can insert categories" on categories;
+create policy "admin users can insert categories" on categories for insert to authenticated
+  using (auth.jwt() ->> 'email' = 'xiao_ranbei@outlook.com');
+drop policy if exists "admin users can delete categories" on categories;
+create policy "admin users can delete categories" on categories for delete to authenticated
+  using (auth.jwt() ->> 'email' = 'xiao_ranbei@outlook.com');
 
 -- questions: 所有人可读；登录用户可插入；管理员邮箱可删除
 drop policy if exists "questions are viewable by everyone" on questions;

@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import type { Category, Difficulty, QuestionType } from "../types";
 import { DIFFICULTY_LABEL, TYPE_LABEL } from "../types";
-import { insertQuestion, insertQuestionsBulk, getCategories } from "../lib/questions";
+import {
+  insertQuestion,
+  insertQuestionsBulk,
+  getCategories,
+  getOrCreateCategory,
+} from "../lib/questions";
 import { useAuthStore } from "../store/authStore";
 import { generateQuestions } from "../lib/ai";
 
@@ -19,6 +24,7 @@ const defaults = {
 
 interface BatchQuestion {
   category_id?: string;
+  category_name?: string;
   difficulty: Difficulty;
   type: QuestionType;
   question: string;
@@ -185,17 +191,43 @@ export default function SubmitQuestion() {
         setMsg(`发现 ${allErrors.length} 个验证错误`);
         return;
       }
-      const questions = (items as BatchQuestion[]).map((item) => ({
-        category_id: (item.category_id || form.categoryId) || undefined,
-        difficulty: item.difficulty || form.difficulty,
-        type: item.type,
-        question: item.question.trim(),
-        answer: item.type === 'fill'
-          ? item.answer.trim()
-          : item.answer.trim().toUpperCase().replace(/[^A-F]/g, ""),
-        options: normalizeOptions(item.options),
-        explanation: item.explanation?.trim() || undefined,
-      }));
+
+      // 处理 category_name：自动创建分类
+      const categoryNameSet = new Set<string>();
+      (items as BatchQuestion[]).forEach((item) => {
+        if (item.category_name?.trim() && !item.category_id) {
+          categoryNameSet.add(item.category_name.trim());
+        }
+      });
+      const categoryNameToId = new Map<string, string>();
+      for (const name of categoryNameSet) {
+        try {
+          const cat = await getOrCreateCategory(name);
+          categoryNameToId.set(name, cat.id);
+        } catch {
+          // 忽略创建失败，继续处理
+        }
+      }
+
+      const questions = await Promise.all(
+        (items as BatchQuestion[]).map(async (item) => {
+          let categoryId = item.category_id || form.categoryId || undefined;
+          if (!categoryId && item.category_name?.trim()) {
+            categoryId = categoryNameToId.get(item.category_name.trim());
+          }
+          return {
+            category_id: categoryId,
+            difficulty: item.difficulty || form.difficulty,
+            type: item.type,
+            question: item.question.trim(),
+            answer: item.type === 'fill'
+              ? item.answer.trim()
+              : item.answer.trim().toUpperCase().replace(/[^A-F]/g, ""),
+            options: normalizeOptions(item.options),
+            explanation: item.explanation?.trim() || undefined,
+          };
+        })
+      );
       await insertQuestionsBulk(questions);
       setMsg(`成功导入 ${questions.length} 道题目`);
       setBatchJson("");
@@ -522,10 +554,11 @@ export default function SubmitQuestion() {
               <ul className="list-disc list-inside space-y-1">
                 <li><code>type</code>: 必填，<code>"choice"</code>（单选）、<code>"multiple"</code>（多选）或 <code>"fill"</code>（填空）</li>
                 <li><code>question</code>: 必填，题目内容</li>
-                <li><code>options</code>: 选择题/多选题必填，选项数组</li>
+                <li><code>options</code>: 选择题/多选题必填，选项数组或对象</li>
                 <li><code>answer</code>: 必填，答案（单选填 A/B/C/D；多选填如 ABD；填空填具体答案）</li>
                 <li><code>difficulty</code>: 可选，1-3，默认使用上方选择</li>
-                <li><code>category_id</code>: 可选，分类ID，默认使用上方选择</li>
+                <li><code>category_id</code>: 可选，分类ID</li>
+                <li><code>category_name</code>: 可选，分类名称（不存在会自动创建）</li>
                 <li><code>explanation</code>: 可选，解析内容</li>
               </ul>
             </div>

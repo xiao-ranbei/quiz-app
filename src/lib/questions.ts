@@ -100,6 +100,42 @@ export async function insertCategory(name: string, description?: string): Promis
   return data as Category;
 }
 
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await supabase.from('categories').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getCategoryByName(name: string): Promise<Category | null> {
+  const { data, error } = await supabase
+    .from('categories')
+    .select()
+    .ilike('name', name.trim())
+    .maybeSingle();
+  if (error) throw error;
+  return data as Category | null;
+}
+
+export async function getOrCreateCategory(name: string): Promise<Category> {
+  const trimmed = name.trim();
+  const existing = await getCategoryByName(trimmed);
+  if (existing) return existing;
+  return insertCategory(trimmed);
+}
+
+export async function getCategoryQuestionCounts(): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from('questions')
+    .select('category_id');
+  if (error) throw error;
+  const counts = new Map<string, number>();
+  (data ?? []).forEach((q) => {
+    if (q.category_id) {
+      counts.set(q.category_id, (counts.get(q.category_id) || 0) + 1);
+    }
+  });
+  return counts;
+}
+
 export async function savePracticeRecord(params: {
   questionId: string;
   userAnswer: string;
