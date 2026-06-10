@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callAI } from '../shared/ai-client.ts';
+import { corsJson, handleCorsPreflight } from '../shared/cors.ts';
 
 interface RequestBody {
   topic: string;
@@ -17,6 +18,9 @@ interface GeneratedQuestion {
 }
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
   const startTime = Date.now();
   try {
     const body: RequestBody = await req.json();
@@ -25,21 +29,15 @@ Deno.serve(async (req) => {
     console.log(`[ai-generate] 请求开始 - topic: ${topic}, count: ${count}, type: ${type}`);
 
     if (!topic) {
-      return new Response(JSON.stringify({ error: '请提供题目主题' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '请提供题目主题' }, { status: 400 }, req);
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
-    
+
     if (!supabaseUrl || !supabaseKey) {
       console.error('[ai-generate] 环境变量未配置');
-      return new Response(JSON.stringify({ error: '服务配置错误' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '服务配置错误' }, { status: 500 }, req);
     }
 
     const supabase = createClient(
@@ -51,17 +49,11 @@ Deno.serve(async (req) => {
     const { data: userData, error: authError } = await supabase.auth.getUser();
     if (authError) {
       console.error('[ai-generate] 用户认证失败:', authError.message);
-      return new Response(JSON.stringify({ error: '用户认证失败: ' + authError.message }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '用户认证失败: ' + authError.message }, { status: 401 }, req);
     }
-    
+
     if (!userData.user) {
-      return new Response(JSON.stringify({ error: '请先登录' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '请先登录' }, { status: 401 }, req);
     }
 
     const { data: configData, error: configError } = await supabase
@@ -72,17 +64,11 @@ Deno.serve(async (req) => {
 
     if (configError) {
       console.error('[ai-generate] 配置查询失败:', configError.message);
-      return new Response(JSON.stringify({ error: '获取 AI 配置失败: ' + configError.message }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '获取 AI 配置失败: ' + configError.message }, { status: 500 }, req);
     }
 
     if (!configData) {
-      return new Response(JSON.stringify({ error: '请先在个人中心配置 AI API' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '请先在个人中心配置 AI API' }, { status: 400 }, req);
     }
 
     const diffText = difficulty === 1 ? '简单' : difficulty === 2 ? '中等' : '困难';
@@ -138,17 +124,19 @@ Deno.serve(async (req) => {
       parsed = JSON.parse(cleaned);
     } catch {
       console.error('[ai-generate] JSON 解析失败:', raw);
-      return new Response(
-        JSON.stringify({ error: 'AI 返回的 JSON 无法解析，请重试', raw }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } },
+      return corsJson(
+        { error: 'AI 返回的 JSON 无法解析，请重试', raw },
+        { status: 502 },
+        req,
       );
     }
 
     if (!Array.isArray(parsed.questions)) {
       console.error('[ai-generate] AI 未返回题目数组:', raw);
-      return new Response(
-        JSON.stringify({ error: 'AI 未返回题目数组，请调整提示词并重试', raw }),
-        { status: 502, headers: { 'Content-Type': 'application/json' } },
+      return corsJson(
+        { error: 'AI 未返回题目数组，请调整提示词并重试', raw },
+        { status: 502 },
+        req,
       );
     }
 
@@ -161,19 +149,13 @@ Deno.serve(async (req) => {
 
     const duration = Date.now() - startTime;
     console.log(`[ai-generate] 请求完成 - 耗时: ${duration}ms, 生成题目数: ${questions.length}`);
-    
-    return new Response(JSON.stringify({ questions }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+
+    return corsJson({ questions }, { status: 200 }, req);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const duration = Date.now() - startTime;
     console.error(`[ai-generate] 请求失败 - 耗时: ${duration}ms, 错误: ${message}`);
-    
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+
+    return corsJson({ error: message }, { status: 500 }, req);
   }
 });

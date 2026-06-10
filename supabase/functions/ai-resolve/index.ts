@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { callAI } from '../shared/ai-client.ts';
+import { corsJson, handleCorsPreflight } from '../shared/cors.ts';
 
 interface RequestBody {
   question_id?: string;
@@ -12,6 +13,9 @@ interface RequestBody {
 }
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
+
   const startTime = Date.now();
   try {
     const body: RequestBody = await req.json();
@@ -20,21 +24,15 @@ Deno.serve(async (req) => {
     console.log(`[ai-resolve] 请求开始 - question_id: ${question_id}, type: ${type}`);
 
     if (!question || !answer) {
-      return new Response(JSON.stringify({ error: '缺少必要参数（question 或 answer）' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '缺少必要参数（question 或 answer）' }, { status: 400 }, req);
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
-    
+
     if (!supabaseUrl || !supabaseKey) {
       console.error('[ai-resolve] 环境变量未配置');
-      return new Response(JSON.stringify({ error: '服务配置错误' }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '服务配置错误' }, { status: 500 }, req);
     }
 
     const supabase = createClient(
@@ -46,17 +44,11 @@ Deno.serve(async (req) => {
     const { data: userData, error: authError } = await supabase.auth.getUser();
     if (authError) {
       console.error('[ai-resolve] 用户认证失败:', authError.message);
-      return new Response(JSON.stringify({ error: '用户认证失败: ' + authError.message }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '用户认证失败: ' + authError.message }, { status: 401 }, req);
     }
-    
+
     if (!userData.user) {
-      return new Response(JSON.stringify({ error: '请先登录' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '请先登录' }, { status: 401 }, req);
     }
 
     if (question_id) {
@@ -70,10 +62,7 @@ Deno.serve(async (req) => {
         console.warn('[ai-resolve] 缓存查询失败:', cacheError.message);
       } else if (cached?.ai_resolution) {
         console.log(`[ai-resolve] 返回缓存结果 - question_id: ${question_id}`);
-        return new Response(JSON.stringify({ resolution: cached.ai_resolution, cached: true }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return corsJson({ resolution: cached.ai_resolution, cached: true }, { status: 200 }, req);
       }
     }
 
@@ -85,23 +74,17 @@ Deno.serve(async (req) => {
 
     if (configError) {
       console.error('[ai-resolve] 配置查询失败:', configError.message);
-      return new Response(JSON.stringify({ error: '获取 AI 配置失败: ' + configError.message }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '获取 AI 配置失败: ' + configError.message }, { status: 500 }, req);
     }
 
     if (!configData) {
-      return new Response(JSON.stringify({ error: '请先在个人中心配置 AI API' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return corsJson({ error: '请先在个人中心配置 AI API' }, { status: 400 }, req);
     }
 
     const optionsText = options
       ? Object.entries(options)
-          .map(([k, v]) => `${k}. ${v}`)
-          .join('\n')
+        .map(([k, v]) => `${k}. ${v}`)
+        .join('\n')
       : '';
 
     const systemPrompt =
@@ -140,7 +123,7 @@ ${optionsText}
         .from('questions')
         .update({ ai_resolution: resolution })
         .eq('id', question_id);
-      
+
       if (updateError) {
         console.warn('[ai-resolve] 缓存写入失败:', updateError.message);
       }
@@ -148,19 +131,13 @@ ${optionsText}
 
     const duration = Date.now() - startTime;
     console.log(`[ai-resolve] 请求完成 - 耗时: ${duration}ms`);
-    
-    return new Response(JSON.stringify({ resolution, cached: false }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+
+    return corsJson({ resolution, cached: false }, { status: 200 }, req);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const duration = Date.now() - startTime;
     console.error(`[ai-resolve] 请求失败 - 耗时: ${duration}ms, 错误: ${message}`);
-    
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+
+    return corsJson({ error: message }, { status: 500 }, req);
   }
 });

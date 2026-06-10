@@ -17,10 +17,31 @@ Write-Host "  Supabase Edge Functions 部署工具" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# 找到 supabase 可执行文件路径
+function Get-SupabasePath {
+    $supabasePath = "C:\Users\xiao_\scoop\shims\supabase.exe"
+    if (Test-Path $supabasePath) {
+        return $supabasePath
+    }
+    # 尝试从 PATH 中查找
+    $cmd = Get-Command supabase -ErrorAction SilentlyContinue
+    if ($cmd) {
+        return "supabase"
+    }
+    return $null
+}
+
+$supabaseCmd = Get-SupabasePath
+if (-not $supabaseCmd) {
+    Write-Host "   ❌ 找不到 Supabase CLI，请先安装" -ForegroundColor Red
+    Write-Host "   安装命令：scoop install supabase" -ForegroundColor Gray
+    exit 1
+}
+
 # -------- 1. 检查 supabase CLI ----------
 Write-Host "[1/4] 检查 Supabase CLI..." -ForegroundColor Yellow
 try {
-    $version = & supabase --version 2>$null
+    $version = & $supabaseCmd --version 2>$null
     if ($LASTEXITCODE -eq 0) {
         Write-Host "   ✅ Supabase CLI 已安装：$version" -ForegroundColor Green
     } else {
@@ -28,7 +49,7 @@ try {
     }
 } catch {
     Write-Host "   ❌ Supabase CLI 未安装" -ForegroundColor Red
-    Write-Host "   请先执行：npm install -g supabase" -ForegroundColor Gray
+    Write-Host "   请先执行：scoop install supabase" -ForegroundColor Gray
     Write-Host "   或访问：https://supabase.com/docs/guides/cli" -ForegroundColor Gray
     exit 1
 }
@@ -36,10 +57,10 @@ Write-Host ""
 
 # -------- 2. 检查登录状态 ----------
 Write-Host "[2/4] 检查登录状态..." -ForegroundColor Yellow
-$projects = & supabase projects list 2>$null
+$projects = & $supabaseCmd projects list 2>$null
 if ($LASTEXITCODE -ne 0 -or -not $projects) {
     Write-Host "   ⚠️  未登录，开始登录流程..." -ForegroundColor DarkYellow
-    supabase login
+    & $supabaseCmd login
     if ($LASTEXITCODE -ne 0) {
         Write-Host "   ❌ 登录失败" -ForegroundColor Red
         exit 1
@@ -49,28 +70,35 @@ if ($LASTEXITCODE -ne 0 -or -not $projects) {
 }
 Write-Host ""
 
-# -------- 3. 检查并链接项目 ----------
+# -------- 3. 链接项目 ----------
 Write-Host "[3/4] 链接项目..." -ForegroundColor Yellow
-# 检查是否已链接
+
+# 用户的项目 Reference ID
+$projectRef = "soiswftjljwcnuzkmpoj"
+
 if (Test-Path ".\supabase\config.toml") {
-    Write-Host "   ✅ 项目已链接（检测到 config.toml）" -ForegroundColor Green
-} else {
-    Write-Host "   请输入你的 Supabase 项目 Reference ID：" -ForegroundColor Cyan
-    Write-Host "   （在 Supabase 控制台 → Project Settings → General → Reference ID 查看）" -ForegroundColor Gray
-    $projectId = Read-Host "   项目 ID"
-
-    if ([string]::IsNullOrWhiteSpace($projectId)) {
-        Write-Host "   ❌ 项目 ID 不能为空" -ForegroundColor Red
-        exit 1
+    $config = Get-Content ".\supabase\config.toml" -Raw
+    if ($config -match "project_id\s*=\s*`"$projectRef`"") {
+        Write-Host "   ✅ 项目已链接（soiswftjljwcnuzkmpoj）" -ForegroundColor Green
+    } else {
+        Write-Host "   ⚠️  检测到 config.toml 但项目 ID 不匹配，正在重新链接..." -ForegroundColor DarkYellow
+        & $supabaseCmd link --project-ref $projectRef
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "   ✅ 项目链接成功" -ForegroundColor Green
+        } else {
+            Write-Host "   ❌ 项目链接失败" -ForegroundColor Red
+            exit 1
+        }
     }
-
-    Write-Host "   正在链接项目..." -ForegroundColor Cyan
-    supabase link --project-ref $projectId.Trim()
-    if ($LASTEXITCODE -ne 0) {
+} else {
+    Write-Host "   正在链接项目：soiswftjljwcnuzkmpoj" -ForegroundColor Cyan
+    supabase link --project-ref $projectRef
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "   ✅ 项目链接成功" -ForegroundColor Green
+    } else {
         Write-Host "   ❌ 项目链接失败" -ForegroundColor Red
         exit 1
     }
-    Write-Host "   ✅ 项目链接成功" -ForegroundColor Green
 }
 Write-Host ""
 
@@ -78,13 +106,13 @@ Write-Host ""
 Write-Host "[4/4] 部署 Edge Functions..." -ForegroundColor Yellow
 Write-Host ""
 
-$functions = @("ai-resolve", "ai-generate", "ai-test-connection")
+$functions = @("ai-test-connection", "ai-resolve", "ai-generate")
 $successCount = 0
 $failCount = 0
 
 foreach ($func in $functions) {
     Write-Host "   正在部署：$func" -ForegroundColor Cyan
-    & supabase functions deploy $func
+    & $supabaseCmd functions deploy $func
     if ($LASTEXITCODE -eq 0) {
         Write-Host "   ✅ $func 部署成功" -ForegroundColor Green
         $successCount++
