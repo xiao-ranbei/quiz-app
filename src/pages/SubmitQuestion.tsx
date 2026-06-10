@@ -22,9 +22,30 @@ interface BatchQuestion {
   difficulty: Difficulty;
   type: QuestionType;
   question: string;
-  options?: string[];
+  options?: string[] | Record<string, string>;
   answer: string;
   explanation?: string;
+}
+
+function isValidOptions(options: unknown): boolean {
+  if (Array.isArray(options)) return options.length > 0;
+  if (options && typeof options === 'object') {
+    return Object.keys(options as Record<string, string>).length > 0;
+  }
+  return false;
+}
+
+function normalizeOptions(
+  options: string[] | Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!options) return undefined;
+  if (Array.isArray(options)) {
+    return options.reduce((acc, opt, idx) => {
+      acc[String.fromCharCode(65 + idx)] = opt;
+      return acc;
+    }, {} as Record<string, string>);
+  }
+  return options;
 }
 
 export default function SubmitQuestion() {
@@ -79,13 +100,16 @@ export default function SubmitQuestion() {
           options[key] = v;
         });
       }
+      const processedAnswer = form.type === 'fill'
+        ? form.answer.trim()
+        : form.answer.trim().toUpperCase().replace(/[^A-F]/g, "");
       await insertQuestion({
         category_id: form.categoryId,
         difficulty: form.difficulty,
         type: form.type,
         question: form.question.trim(),
         options: Object.keys(options).length ? options : undefined,
-        answer: form.answer.trim().toUpperCase().replace(/[^A-F]/g, ""),
+        answer: processedAnswer,
         explanation: form.explanation.trim() || undefined,
       });
       setMsg("题目已提交");
@@ -113,8 +137,8 @@ export default function SubmitQuestion() {
     if (!q.answer?.trim()) {
       errors.push(`第 ${index + 1} 项：answer 不能为空`);
     }
-    if ((q.type === "choice" || q.type === "multiple") && (!q.options || !Array.isArray(q.options) || q.options.length === 0)) {
-      errors.push(`第 ${index + 1} 项：选择题和多选题必须提供 options 数组`);
+    if ((q.type === "choice" || q.type === "multiple") && !isValidOptions(q.options)) {
+      errors.push(`第 ${index + 1} 项：选择题和多选题必须提供 options（数组或对象）`);
     }
     if (q.difficulty && (q.difficulty < 1 || q.difficulty > 3)) {
       errors.push(`第 ${index + 1} 项：difficulty 必须是 1、2 或 3`);
@@ -156,13 +180,10 @@ export default function SubmitQuestion() {
         ...item,
         category_id: item.category_id || form.categoryId,
         difficulty: item.difficulty || form.difficulty,
-        answer: item.answer.trim().toUpperCase().replace(/[^A-F]/g, ""),
-        options: item.options
-          ? item.options.reduce((acc, opt, idx) => {
-              acc[String.fromCharCode(65 + idx)] = opt;
-              return acc;
-            }, {} as Record<string, string>)
-          : undefined,
+        answer: item.type === 'fill'
+          ? item.answer.trim()
+          : item.answer.trim().toUpperCase().replace(/[^A-F]/g, ""),
+        options: normalizeOptions(item.options),
       }));
       await insertQuestionsBulk(questions);
       setMsg(`成功导入 ${questions.length} 道题目`);
@@ -349,7 +370,12 @@ export default function SubmitQuestion() {
                 <input
                   id="answer"
                   value={form.answer}
-                  onChange={(e) => setForm({ ...form, answer: e.target.value.toUpperCase() })}
+                  onChange={(e) => setForm({
+                    ...form,
+                    answer: form.type === 'fill'
+                      ? e.target.value
+                      : e.target.value.toUpperCase(),
+                  })}
                   placeholder={form.type === "fill" ? "填空的答案" : form.type === "multiple" ? "ABD" : "B"}
                   className="input-theme w-full"
                 />
