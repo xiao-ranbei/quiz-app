@@ -60,17 +60,17 @@ export async function resolveQuestionAI(params: {
 }
 
 export async function generateQuestions(params: {
-  topic: string;
+  prompt: string;
   count?: number;
-  difficulty?: 1 | 2 | 3;
-  type?: 'choice' | 'fill';
-}): Promise<Array<{
-  question: string;
-  options?: Record<string, string>;
-  answer: string;
-  explanation?: string;
-}>> {
-  const { data, error } = await supabase.functions.invoke('ai-generate', { body: params });
+  categoryId?: string;
+}): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('ai-generate', { 
+    body: {
+      topic: params.prompt,
+      count: params.count,
+      category_id: params.categoryId,
+    } 
+  });
   if (error) throw new Error(error.message);
-  return (data as { questions: Array<{ question: string; options?: Record<string, string>; answer: string; explanation?: string }> }).questions;
+  return (data as { result: string }).result;
 }

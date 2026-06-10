@@ -1,5 +1,5 @@
 export type Difficulty = 1 | 2 | 3;
-export type QuestionType = 'choice' | 'fill';
+export type QuestionType = 'choice' | 'multiple' | 'fill';
 export type Mode = 'practice' | 'exam';
 
 export interface Category {
@@ -77,6 +77,7 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
 };
 
 export const TYPE_LABEL: Record<QuestionType, string> = {
-  choice: '选择题',
+  choice: '单选题',
+  multiple: '多选题',
   fill: '填空题',
 };

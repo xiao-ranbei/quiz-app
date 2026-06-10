@@ -90,4 +90,8 @@
     border: 1px solid var(--border-color);
     border-radius: 0.75rem;
   }
+
+  .progress-bar {
+    width: var(--progress, 0%);
+  }
 }

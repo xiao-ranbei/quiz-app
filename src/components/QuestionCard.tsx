@@ -28,28 +28,55 @@ export default function QuestionCard({
   aiLoading = false,
 }: Props) {
   const [fillValue, setFillValue] = useState(userAnswer);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
 
   useEffect(() => {
     setFillValue(userAnswer);
-  }, [userAnswer, question.id]);
+    if (question.type === 'multiple') {
+      setSelectedOptions(userAnswer.split('').filter(c => c));
+    }
+  }, [userAnswer, question.id, question.type]);
 
   const isRevealed = showAnswer || mode === 'review';
+  
   const isCorrect = (() => {
     if (!isRevealed) return null;
-    const a = userAnswer.trim().toLowerCase().replace(/\s+/g, '');
-    const b = question.answer.trim().toLowerCase().replace(/\s+/g, '');
-    return a === b;
+    const normalizeAnswer = (ans: string) => {
+      return ans.trim().toLowerCase().replace(/\s+/g, '').split('').sort().join('');
+    };
+    return normalizeAnswer(userAnswer) === normalizeAnswer(question.answer);
   })();
 
   const handleChoice = (key: string) => {
     if (isRevealed) return;
-    onAnswerChange?.(key);
+    if (question.type === 'multiple') {
+      const newSelected = selectedOptions.includes(key)
+        ? selectedOptions.filter(k => k !== key)
+        : [...selectedOptions, key].sort();
+      setSelectedOptions(newSelected);
+      onAnswerChange?.(newSelected.join(''));
+    } else {
+      onAnswerChange?.(key);
+    }
   };
 
   const handleFillSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isRevealed || !onAnswerChange) return;
     onAnswerChange(fillValue);
+  };
+
+  const handleMultiSelectAll = () => {
+    if (isRevealed || !question.options) return;
+    const allOptions = Object.keys(question.options);
+    setSelectedOptions(allOptions);
+    onAnswerChange?.(allOptions.join(''));
+  };
+
+  const handleMultiClear = () => {
+    if (isRevealed) return;
+    setSelectedOptions([]);
+    onAnswerChange?.('');
   };
 
   return (
@@ -103,6 +130,57 @@ export default function QuestionCard({
               </button>
             );
           })}
+        </div>
+      )}
+
+      {question.type === 'multiple' && question.options && (
+        <div className="mt-5">
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-sm text-theme-secondary">多选题（可多选）</span>
+            <div className="flex gap-2">
+              <button
+                onClick={handleMultiSelectAll}
+                disabled={isRevealed}
+                className="text-xs px-2 py-1 rounded border border-theme text-theme-secondary hover:bg-theme-hover disabled:opacity-50"
+              >
+                全选
+              </button>
+              <button
+                onClick={handleMultiClear}
+                disabled={isRevealed}
+                className="text-xs px-2 py-1 rounded border border-theme text-theme-secondary hover:bg-theme-hover disabled:opacity-50"
+              >
+                清空
+              </button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {Object.entries(question.options).map(([key, value]) => {
+              const isUser = selectedOptions.includes(key);
+              const isRight = question.answer.toLowerCase().includes(key.toLowerCase());
+              let extra = 'border-theme text-theme-secondary';
+              if (isRevealed) {
+                if (isRight) extra = 'bg-emerald-700/20 border-emerald-500 text-emerald-800 dark:text-emerald-100';
+                else if (isUser) extra = 'bg-rose-700/20 border-rose-500 text-rose-800 dark:text-rose-100';
+              } else if (isUser) {
+                extra = 'bg-brand-600/20 border-brand-500 text-brand-700 dark:text-brand-200';
+              }
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${extra}`}
+                  onClick={() => handleChoice(key)}
+                >
+                  <span className="inline-flex items-center justify-center w-6 h-6 mr-2 rounded-full border border-current">
+                    {isUser && <span className="w-3 h-3 rounded-full bg-current"></span>}
+                  </span>
+                  <span className="inline-block w-6 mr-1">{key}.</span>
+                  {value}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -162,7 +240,7 @@ export default function QuestionCard({
           <button
             type="button"
             onClick={onReveal}
-            disabled={!userAnswer}
+            disabled={question.type === 'multiple' ? selectedOptions.length === 0 : !userAnswer}
             className="px-4 py-2 text-sm rounded-md bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             查看答案

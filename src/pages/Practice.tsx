@@ -130,8 +130,9 @@ export default function Practice() {
           onTypeChange={setType}
         />
         <div className="mb-6 flex items-center gap-3">
-          <label className="text-sm text-theme-secondary">题目数量：</label>
+          <label htmlFor="practice-count" className="text-sm text-theme-secondary">题目数量：</label>
           <input
+            id="practice-count"
             type="number"
             min={1}
             max={50}
@@ -179,8 +180,8 @@ export default function Practice() {
 
       <div className="w-full bg-theme-secondary rounded-full h-1.5 mb-6">
         <div
-          className="bg-brand-500 h-1.5 rounded-full transition-all"
-          style={{ width: `${((currentIndex + (showAnswer ? 1 : 0)) / queue.length) * 100}%` }}
+          className="bg-brand-500 h-1.5 rounded-full transition-all progress-bar"
+          style={{ '--progress': `${((currentIndex + (showAnswer ? 1 : 0)) / queue.length) * 100}%` } as React.CSSProperties}
         ></div>
       </div>
 

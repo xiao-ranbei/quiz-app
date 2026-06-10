@@ -135,8 +135,9 @@ export default function Exam() {
         />
         <div className="grid md:grid-cols-2 gap-4 mt-2">
           <div>
-            <label className="block text-sm text-theme-secondary mb-2">题目数量（1-50）</label>
+            <label htmlFor="exam-count" className="block text-sm text-theme-secondary mb-2">题目数量（1-50）</label>
             <input
+              id="exam-count"
               type="number"
               min={1}
               max={50}
@@ -146,8 +147,9 @@ export default function Exam() {
             />
           </div>
           <div>
-            <label className="block text-sm text-theme-secondary mb-2">时间限制（分钟）</label>
+            <label htmlFor="exam-time" className="block text-sm text-theme-secondary mb-2">时间限制（分钟）</label>
             <input
+              id="exam-time"
               type="number"
               min={1}
               max={180}
@@ -235,8 +237,8 @@ export default function Exam() {
 
       <div className="w-full bg-theme-secondary rounded-full h-1.5 mb-5">
         <div
-          className="bg-brand-500 h-1.5 rounded-full transition-all"
-          style={{ width: `${((exam.currentIndex + 1) / exam.questions.length) * 100}%` }}
+          className="bg-brand-500 h-1.5 rounded-full transition-all progress-bar"
+          style={{ '--progress': `${((exam.currentIndex + 1) / exam.questions.length) * 100}%` } as React.CSSProperties}
         ></div>
       </div>
 
