@@ -82,10 +82,11 @@ export default function SubmitQuestion() {
       <div className="rounded-xl border border-theme bg-theme-card p-5">
         <div className="grid md:grid-cols-3 gap-3 mb-4">
           <div>
-            <label className="block text-sm text-theme-secondary mb-1.5">
+            <label htmlFor="categoryId" className="block text-sm text-theme-secondary mb-1.5">
               分类
             </label>
             <select
+              id="categoryId"
               value={form.categoryId}
               onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
               className="input-theme w-full"
@@ -99,10 +100,11 @@ export default function SubmitQuestion() {
             </select>
           </div>
           <div>
-            <label className="block text-sm text-theme-secondary mb-1.5">
+            <label htmlFor="difficulty" className="block text-sm text-theme-secondary mb-1.5">
               难度
             </label>
             <select
+              id="difficulty"
               value={form.difficulty}
               onChange={(e) =>
                 setForm({
@@ -120,10 +122,11 @@ export default function SubmitQuestion() {
             </select>
           </div>
           <div>
-            <label className="block text-sm text-theme-secondary mb-1.5">
+            <label htmlFor="questionType" className="block text-sm text-theme-secondary mb-1.5">
               题型
             </label>
             <select
+              id="questionType"
               value={form.type}
               onChange={(e) =>
                 setForm({ ...form, type: e.target.value as QuestionType })
@@ -137,10 +140,11 @@ export default function SubmitQuestion() {
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm text-theme-secondary mb-1.5">
+          <label htmlFor="questionContent" className="block text-sm text-theme-secondary mb-1.5">
             题目
           </label>
           <textarea
+            id="questionContent"
             rows={4}
             value={form.question}
             onChange={(e) => setForm({ ...form, question: e.target.value })}
@@ -156,28 +160,34 @@ export default function SubmitQuestion() {
         {form.type === "choice" && (
           <div className="grid md:grid-cols-2 gap-3 mb-4">
             {(["A", "B", "C", "D"] as const).map((key) => (
-              <input
-                key={key}
-                value={form.options[key]}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    options: { ...form.options, [key]: e.target.value },
-                  })
-                }
-                placeholder={`选项 ${key}`}
-                className="input-theme"
-              />
+              <div key={key}>
+                <label htmlFor={`option-${key}`} className="block text-sm text-theme-secondary mb-1">
+                  选项 {key}
+                </label>
+                <input
+                  id={`option-${key}`}
+                  value={form.options[key]}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      options: { ...form.options, [key]: e.target.value },
+                    })
+                  }
+                  placeholder={`选项 ${key}`}
+                  className="input-theme w-full"
+                />
+              </div>
             ))}
           </div>
         )}
 
         <div className="grid md:grid-cols-2 gap-3 mb-4">
           <div>
-            <label className="block text-sm text-theme-secondary mb-1.5">
+            <label htmlFor="answer" className="block text-sm text-theme-secondary mb-1.5">
               答案{form.type === "choice" ? "（A / B / C / D）" : ""}
             </label>
             <input
+              id="answer"
               value={form.answer}
               onChange={(e) => setForm({ ...form, answer: e.target.value })}
               placeholder={form.type === "choice" ? "B" : "填空的答案"}
@@ -185,10 +195,11 @@ export default function SubmitQuestion() {
             />
           </div>
           <div>
-            <label className="block text-sm text-theme-secondary mb-1.5">
+            <label htmlFor="explanation" className="block text-sm text-theme-secondary mb-1.5">
               解析（可选）
             </label>
             <input
+              id="explanation"
               value={form.explanation}
               onChange={(e) =>
                 setForm({ ...form, explanation: e.target.value })
