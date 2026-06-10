@@ -53,12 +53,12 @@ export default function QuestionCard({
   };
 
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-800/60 p-6">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mb-3">
-        <span className="px-2 py-1 rounded-md bg-slate-700 text-slate-200">
+    <div className="rounded-xl border border-theme bg-theme-card p-6">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-theme-muted mb-3">
+        <span className="px-2 py-1 rounded-md bg-theme-input text-theme-secondary">
           {TYPE_LABEL[question.type]}
         </span>
-        <span className="px-2 py-1 rounded-md bg-slate-700 text-slate-200">
+        <span className="px-2 py-1 rounded-md bg-theme-input text-theme-secondary">
           {DIFFICULTY_LABEL[question.difficulty]}
         </span>
         {question.reference_url && (
@@ -66,42 +66,43 @@ export default function QuestionCard({
             href={question.reference_url}
             target="_blank"
             rel="noreferrer"
-            className="text-brand-300 hover:underline"
+            className="text-brand-500 hover:underline"
           >
             参考资料
           </a>
         )}
       </div>
 
-      <h2 className="text-lg md:text-xl text-slate-100 leading-relaxed whitespace-pre-wrap">
+      <h2 className="text-lg md:text-xl text-theme-primary leading-relaxed whitespace-pre-wrap">
         {question.question}
       </h2>
 
       {question.type === 'choice' && question.options && (
         <div className="mt-5 space-y-2">
           {Object.entries(question.options).map(([key, value]) => {
-          const isUser = userAnswer === key;
-          const isRight = key.toLowerCase() === question.answer.toLowerCase();
-          let cls =
-            'w-full text-left px-4 py-3 rounded-lg border border-slate-700 text-slate-200 transition-colors';
-          if (isRevealed) {
-            if (isRight) cls += ' bg-emerald-700/40 border-emerald-500 text-emerald-100';
-            else if (isUser) cls += ' bg-rose-700/40 border-rose-500 text-rose-100';
-            else cls += ' hover:bg-slate-800';
-          } else if (isUser) {
-            cls += ' bg-brand-700/40 border-brand-500';
-          } else {
-            cls += ' hover:bg-slate-800 hover:border-slate-600';
-          }
-          return (
-            <button key={key} type="button" className={cls} onClick={() => handleChoice(key)}>
-              <span className="inline-block w-7 h-7 mr-2 text-center font-semibold">
-                {key}.
-              </span>
-              {value}
-            </button>
-          );
-      })}
+            const isUser = userAnswer === key;
+            const isRight = key.toLowerCase() === question.answer.toLowerCase();
+            let extra = 'border-theme text-theme-secondary';
+            if (isRevealed) {
+              if (isRight) extra = 'bg-emerald-700/20 border-emerald-500 text-emerald-800 dark:text-emerald-100';
+              else if (isUser) extra = 'bg-rose-700/20 border-rose-500 text-rose-800 dark:text-rose-100';
+            } else if (isUser) {
+              extra = 'bg-brand-600/20 border-brand-500 text-brand-700 dark:text-brand-200';
+            }
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${extra}`}
+                onClick={() => handleChoice(key)}
+              >
+                <span className="inline-block w-7 h-7 mr-2 text-center font-semibold">
+                  {key}.
+                </span>
+                {value}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -116,7 +117,7 @@ export default function QuestionCard({
             }}
             disabled={isRevealed}
             placeholder="请输入答案..."
-            className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-brand-500 disabled:opacity-80"
+            className="input-theme w-full"
           />
         </form>
       )}
@@ -124,23 +125,31 @@ export default function QuestionCard({
       {isRevealed && (
         <div className="mt-5 space-y-3">
           <div
-          className={`rounded-lg p-4 border ${
-            isCorrect ? 'border-emerald-600/60 bg-emerald-900/40' : 'border-rose-600/60 bg-rose-900/40'
-          }`}
-        >
-          <div className="text-sm font-semibold text-slate-100 mb-1">
-            {isCorrect ? '✓ 回答正确' : '✗ 回答错误'}
+            className={`rounded-lg p-4 border ${
+              isCorrect
+                ? 'border-emerald-500 bg-emerald-500/10'
+                : 'border-rose-500 bg-rose-500/10'
+            }`}
+          >
+            <div
+              className={`text-sm font-semibold mb-1 ${
+                isCorrect ? 'text-emerald-700 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-200'
+              }`}
+            >
+              {isCorrect ? '✓ 回答正确' : '✗ 回答错误'}
+            </div>
+            <div className="text-sm text-theme-secondary">正确答案：{question.answer}</div>
+            {question.explanation && (
+              <div className="mt-2 text-sm text-theme-secondary">解析：{question.explanation}</div>
+            )}
           </div>
-          <div className="text-sm text-slate-300">正确答案：{question.answer}</div>
-          {question.explanation && (
-            <div className="mt-2 text-sm text-slate-300">解析：{question.explanation}</div>
-          )}
-        </div>
 
           {aiResolution && (
-            <div className="rounded-lg p-4 border border-brand-500/60 bg-brand-900/30">
-              <div className="text-sm font-semibold text-brand-200 mb-1">AI 智能解析</div>
-              <div className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+            <div className="rounded-lg p-4 border border-brand-500/60 bg-brand-500/10">
+              <div className="text-sm font-semibold text-brand-700 dark:text-brand-200 mb-1">
+                AI 智能解析
+              </div>
+              <div className="text-sm text-theme-secondary whitespace-pre-wrap leading-relaxed">
                 {aiResolution}
               </div>
             </div>
@@ -163,7 +172,7 @@ export default function QuestionCard({
               type="button"
               onClick={onAskAI}
               disabled={aiLoading}
-              className="px-4 py-2 text-sm rounded-md bg-slate-700 hover:bg-slate-600 text-white"
+              className="px-4 py-2 text-sm rounded-md border border-theme text-theme-secondary hover:bg-theme-hover disabled:opacity-50"
             >
               {aiLoading ? 'AI 解析中...' : '问 AI 解析'}
             </button>
@@ -171,18 +180,16 @@ export default function QuestionCard({
         </div>
       )}
 
-      {aiResolution && isRevealed && (
+      {aiResolution && isRevealed && showAIBtn && onAskAI && !aiResolution && (
         <div className="mt-3">
-          {showAIBtn && onAskAI && !aiResolution && (
-            <button
-              type="button"
-              onClick={onAskAI}
-              disabled={aiLoading}
-              className="px-4 py-2 text-sm rounded-md bg-slate-700 hover:bg-slate-600 text-white"
-            >
-              {aiLoading ? 'AI 解析中...' : '问 AI 解析'}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onAskAI}
+            disabled={aiLoading}
+            className="px-4 py-2 text-sm rounded-md border border-theme text-theme-secondary hover:bg-theme-hover"
+          >
+            {aiLoading ? 'AI 解析中...' : '问 AI 解析'}
+          </button>
         </div>
       )}
     </div>

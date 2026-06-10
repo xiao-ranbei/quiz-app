@@ -59,7 +59,7 @@ export default function Questions() {
   }, [categories]);
 
   return (
-    <div className="py-8">
+    <div className="py-8 max-w-5xl mx-auto">
       <div className="flex items-end justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-theme-primary mb-1">题库</h1>
@@ -77,8 +77,8 @@ export default function Questions() {
         <div
           className={`mb-4 text-sm rounded-md p-3 border ${
             msg.ok
-              ? 'border-emerald-600/60 bg-emerald-900/30 text-emerald-200'
-              : 'border-rose-600/60 bg-rose-900/30 text-rose-200'
+              ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+              : 'border-rose-500/50 bg-rose-500/10 text-rose-700 dark:text-rose-300'
           }`}
         >
           {msg.text}
@@ -118,7 +118,7 @@ export default function Questions() {
                       {DIFFICULTY_LABEL[q.difficulty]}
                     </span>
                     {q.category_id && catMap.has(q.category_id) && (
-                      <span className="px-2 py-0.5 rounded bg-brand-900/60 text-brand-200 border border-brand-800">
+                      <span className="px-2 py-0.5 rounded bg-brand-500/10 border border-brand-500/30 text-brand-700 dark:text-brand-200">
                         {catMap.get(q.category_id)}
                       </span>
                     )}
@@ -127,7 +127,7 @@ export default function Questions() {
                     {q.question}
                   </div>
                   <div className="mt-3 text-sm text-theme-muted">
-                    答案：<span className="text-emerald-300">{q.answer}</span>
+                    答案：<span className="text-emerald-700 dark:text-emerald-300">{q.answer}</span>
                   </div>
                   {q.explanation && (
                     <div className="mt-2 text-sm text-theme-muted">解析：{q.explanation}</div>

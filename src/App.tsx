@@ -18,9 +18,9 @@ export default function App() {
 
   return (
     <HashRouter>
-      <div style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }} className="min-h-screen">
+      <div className="min-h-screen bg-theme-primary text-theme-primary">
         <Navbar />
-        <main className="px-4" style={{ color: 'var(--text-primary)' }}>
+        <main className="px-4">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/questions" element={<Questions />} />
@@ -33,7 +33,7 @@ export default function App() {
             <Route path="*" element={<Home />} />
           </Routes>
         </main>
-        <footer className="py-10 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+        <footer className="py-10 text-center text-xs text-theme-muted">
           © {new Date().getFullYear()} Quiz App
         </footer>
       </div>

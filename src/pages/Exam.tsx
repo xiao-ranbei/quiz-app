@@ -16,7 +16,7 @@ export default function Exam() {
   const [difficulty, setDifficulty] = useState<Difficulty | ''>('');
   const [type, setType] = useState<QuestionType | ''>('');
   const [count, setCount] = useState(10);
-  const [timeLimit, setTimeLimit] = useState(15); // minutes
+  const [timeLimit, setTimeLimit] = useState(15);
   const [errorMsg, setErrorMsg] = useState('');
   const [remainingSec, setRemainingSec] = useState(0);
 
@@ -91,9 +91,6 @@ export default function Exam() {
       } catch (e) {
         console.warn(e);
       }
-    } else {
-      // 游客也可以做，但不保存到数据库
-      console.info('游客未保存考试结果');
     }
   };
 
@@ -122,8 +119,8 @@ export default function Exam() {
   if (prepStage) {
     return (
       <div className="py-8 max-w-3xl mx-auto">
-        <h1 className="text-2xl font-bold text-slate-100 mb-1">模拟考试</h1>
-        <p className="text-sm text-slate-400 mb-6">
+        <h1 className="text-2xl font-bold text-theme-primary mb-1">模拟考试</h1>
+        <p className="text-sm text-theme-muted mb-6">
           设定题目数量与时间限制，完成后查看成绩与错题解析。
         </p>
         <CategoryFilter
@@ -138,33 +135,29 @@ export default function Exam() {
         />
         <div className="grid md:grid-cols-2 gap-4 mt-2">
           <div>
-            <label className="block text-sm text-slate-300 mb-2">题目数量（1-50）</label>
+            <label className="block text-sm text-theme-secondary mb-2">题目数量（1-50）</label>
             <input
               type="number"
               min={1}
               max={50}
               value={count}
-              onChange={(e) =>
-                setCount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))
-              }
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 text-sm"
+              onChange={(e) => setCount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
+              className="input-theme w-full"
             />
           </div>
           <div>
-            <label className="block text-sm text-slate-300 mb-2">时间限制（分钟）</label>
+            <label className="block text-sm text-theme-secondary mb-2">时间限制（分钟）</label>
             <input
               type="number"
               min={1}
               max={180}
               value={timeLimit}
-              onChange={(e) =>
-                setTimeLimit(Math.max(1, Math.min(180, Number(e.target.value) || 1)))
-              }
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 text-sm"
+              onChange={(e) => setTimeLimit(Math.max(1, Math.min(180, Number(e.target.value) || 1)))}
+              className="input-theme w-full"
             />
           </div>
         </div>
-        {errorMsg && <div className="text-sm text-rose-400 mt-3">{errorMsg}</div>}
+        {errorMsg && <div className="text-sm text-rose-500 mt-3">{errorMsg}</div>}
         <div className="mt-6">
           <button
             onClick={startExam}
@@ -184,16 +177,18 @@ export default function Exam() {
   if (exam.submitted && stats) {
     return (
       <div className="py-8 max-w-3xl mx-auto">
-        <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-8 text-center mb-6">
-          <div className="text-sm text-slate-400 mb-2">考试成绩</div>
-          <div className="text-5xl font-bold text-brand-300 mb-2">
+        <div className="rounded-xl border border-theme bg-theme-card p-8 text-center mb-6">
+          <div className="text-sm text-theme-muted mb-2">考试成绩</div>
+          <div className="text-5xl font-bold text-brand-600 dark:text-brand-300 mb-2">
             {stats.correct} / {stats.total}
           </div>
-          <div className="text-lg text-slate-300">正确率 {stats.percent}%</div>
-          <div className="text-sm text-slate-500 mt-2">用时 {timeLimit - Math.ceil(remainingSec / 60)} 分钟</div>
+          <div className="text-lg text-theme-secondary">正确率 {stats.percent}%</div>
+          <div className="text-sm text-theme-muted mt-2">
+            用时 {timeLimit - Math.ceil(remainingSec / 60)} 分钟
+          </div>
         </div>
 
-        <h2 className="text-lg font-semibold text-slate-100 mb-4">逐题解析</h2>
+        <h2 className="text-lg font-semibold text-theme-primary mb-4">逐题解析</h2>
         <div className="space-y-4">
           {exam.questions.map((q) => (
             <QuestionCard
@@ -222,21 +217,23 @@ export default function Exam() {
     <div className="py-8 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100">{exam.title}</h1>
-          <div className="text-xs text-slate-400">
+          <h1 className="text-lg font-semibold text-theme-primary">{exam.title}</h1>
+          <div className="text-xs text-theme-muted">
             第 {exam.currentIndex + 1} / {exam.questions.length} 题
           </div>
         </div>
         <div
-          className={`px-4 py-2 rounded-lg text-sm font-mono ${
-            remainingSec < 60 ? 'bg-rose-900/60 text-rose-200 border border-rose-700' : 'bg-slate-800 text-slate-200 border border-slate-700'
+          className={`px-4 py-2 rounded-lg text-sm font-mono border ${
+            remainingSec < 60
+              ? 'bg-rose-500/10 border-rose-500 text-rose-600 dark:text-rose-200'
+              : 'bg-theme-card border-theme text-theme-secondary'
           }`}
         >
           ⏱ {mm}:{ss}
         </div>
       </div>
 
-      <div className="w-full bg-slate-800 rounded-full h-1.5 mb-5">
+      <div className="w-full bg-theme-secondary rounded-full h-1.5 mb-5">
         <div
           className="bg-brand-500 h-1.5 rounded-full transition-all"
           style={{ width: `${((exam.currentIndex + 1) / exam.questions.length) * 100}%` }}
@@ -255,8 +252,8 @@ export default function Exam() {
                 isCurrent
                   ? 'bg-brand-600 text-white border-brand-500'
                   : answered
-                  ? 'bg-emerald-800/60 border-emerald-600 text-emerald-100'
-                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-700 dark:text-emerald-200'
+                  : 'bg-theme-card border-theme text-theme-secondary hover:bg-theme-hover'
               }`}
             >
               {idx + 1}
@@ -279,7 +276,7 @@ export default function Exam() {
             <button
               onClick={() => exam.goTo(Math.max(0, exam.currentIndex - 1))}
               disabled={exam.currentIndex === 0}
-              className="px-4 py-2 text-sm rounded-md bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+              className="px-4 py-2 text-sm rounded-md border border-theme text-theme-secondary hover:bg-theme-hover disabled:opacity-50"
             >
               上一题
             </button>

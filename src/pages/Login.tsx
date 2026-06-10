@@ -1,138 +1,95 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-
-interface FormData {
-  email: string;
-  password: string;
-}
+import { useAuthStore } from '../store/authStore';
 
 export default function Login() {
-  const navigate = useNavigate();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
-    defaultValues: { email: '', password: '' },
-  });
+  const { signIn, signUp, error, loading } = useAuthStore();
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const onSubmit = async (data: FormData) => {
-    setMsg(null);
-    setLoading(true);
-    try {
-      if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
-          email: data.email,
-          password: data.password,
-        });
-        if (error) throw error;
-        setMsg({ ok: true, text: '注册成功，正在进入...' });
-        setTimeout(() => navigate('/'), 600);
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password: data.password,
-        });
-        if (error) throw error;
-        navigate('/');
-      }
-    } catch (e) {
-      let text = e instanceof Error ? e.message : '操作失败';
-      if (/invalid.*credentials/i.test(text) || /invalid login/i.test(text)) {
-        text = '邮箱或密码错误，请重试。';
-      } else if (/weak/i.test(text)) {
-        text = '密码太弱，请使用至少 6 位字符。';
-      } else if (/already registered/i.test(text) || /already exists/i.test(text)) {
-        text = '该邮箱已被注册，请直接登录。';
-      }
-      setMsg({ ok: false, text });
-    } finally {
-      setLoading(false);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mode === 'login') {
+      await signIn(email, password);
+    } else {
+      await signUp(email, password);
     }
   };
 
   return (
-    <div className="py-16 max-w-md mx-auto">
-      <div className="rounded-2xl bg-theme-card border border-theme p-8">
-        <h1 className="text-2xl font-bold text-theme-primary text-center mb-1">
-          {mode === 'signin' ? '登录' : '注册'}
+    <div className="min-h-[70vh] flex items-center justify-center">
+      <form
+        onSubmit={submit}
+        className="w-full max-w-sm rounded-xl border border-theme bg-theme-card p-6"
+      >
+        <h1 className="text-2xl font-bold text-theme-primary mb-1">
+          {mode === 'login' ? '登录' : '注册'}
         </h1>
-        <p className="text-sm text-theme-muted text-center mb-6">刷题平台</p>
+        <p className="text-sm text-theme-muted mb-5">
+          使用邮箱与密码登录，无需邮箱验证。
+        </p>
 
-        <div className="flex gap-2 mb-5">
-          <button
-            type="button"
-            onClick={() => setMode('signin')}
-            className={`flex-1 px-4 py-2 text-sm rounded-md border ${
-              mode === 'signin'
-                ? 'bg-brand-600 text-white border-brand-500'
-                : 'bg-theme-card text-theme-secondary border-theme hover-theme'
-            }`}
-          >
-            登录
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('signup')}
-            className={`flex-1 px-4 py-2 text-sm rounded-md border ${
-              mode === 'signup'
-                ? 'bg-brand-600 text-white border-brand-500'
-                : 'bg-theme-card text-theme-secondary border-theme hover-theme'
-            }`}
-          >
-            注册
-          </button>
-        </div>
+        <label className="block text-sm text-theme-secondary mb-1.5">邮箱</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          required
+          className="input-theme w-full mb-3"
+        />
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div>
-            <label className="block text-sm text-theme-secondary mb-1">邮箱</label>
-            <input
-              type="email"
-              {...register('email', { required: true })}
-              className="w-full px-3 py-2 bg-theme-input border border-theme rounded-md text-theme-primary text-sm"
-            />
-            {errors.email && (
-              <div className="text-xs text-rose-400 mt-1">请填写邮箱</div>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm text-theme-secondary mb-1">密码（至少 6 位）</label>
-            <input
-              type="password"
-              {...register('password', { required: true, minLength: 6 })}
-              className="w-full px-3 py-2 bg-theme-input border border-theme rounded-md text-theme-primary text-sm"
-            />
-            {errors.password && (
-              <div className="text-xs text-rose-400 mt-1">密码至少 6 位</div>
-            )}
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-md text-sm disabled:opacity-60"
-          >
-            {loading ? '处理中...' : mode === 'signin' ? '登录' : '注册'}
-          </button>
-        </form>
+        <label className="block text-sm text-theme-secondary mb-1.5">密码</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="至少 6 位"
+          minLength={6}
+          required
+          className="input-theme w-full mb-3"
+        />
 
-        {msg && (
-          <div
-            className={`mt-4 text-sm rounded-md p-3 border ${
-              msg.ok
-                ? 'border-emerald-600/60 bg-emerald-900/30 text-emerald-200'
-                : 'border-rose-600/60 bg-rose-900/30 text-rose-200'
-            }`}
-          >
-            {msg.text}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-sm font-medium disabled:opacity-60"
+        >
+          {loading ? '处理中...' : mode === 'login' ? '登录' : '注册'}
+        </button>
+
+        {error && (
+          <div className="mt-3 text-sm text-rose-600 dark:text-rose-300 whitespace-pre-wrap">
+            {error}
           </div>
         )}
 
-        <div className="mt-5 text-xs text-slate-500 text-center">
-          返回 <Link to="/" className="text-brand-300 hover:underline">首页</Link>
+        <div className="mt-5 text-sm text-theme-muted text-center">
+          {mode === 'login' ? (
+            <>
+              还没有账号？
+              <button
+                type="button"
+                onClick={() => setMode('register')}
+                className="text-brand-600 dark:text-brand-300 hover:underline ml-1"
+              >
+                去注册
+              </button>
+            </>
+          ) : (
+            <>
+              已有账号？
+              <button
+                type="button"
+                onClick={() => setMode('login')}
+                className="text-brand-600 dark:text-brand-300 hover:underline ml-1"
+              >
+                去登录
+              </button>
+            </>
+          )}
         </div>
-      </div>
+      </form>
     </div>
   );
 }

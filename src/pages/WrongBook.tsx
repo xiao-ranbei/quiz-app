@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import type { Question, WrongBookItem } from '../types';
-import { DIFFICULTY_LABEL, TYPE_LABEL } from '../types';
+import { DIFFICULTY_LABEL } from '../types';
 import { getWrongBook, toggleWrongBookMastered } from '../lib/questions';
 import { useAuthStore } from '../store/authStore';
 import Loading from '../components/Loading';
@@ -9,7 +8,6 @@ import EmptyState from '../components/EmptyState';
 
 export default function WrongBook() {
   const { user, loading: authLoading } = useAuthStore();
-  const navigate = useNavigate();
   const [items, setItems] = useState<WrongBookItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [onlyNotMastered, setOnlyNotMastered] = useState(true);
@@ -29,14 +27,8 @@ export default function WrongBook() {
   if (!user) {
     return (
       <div className="py-16 text-center">
-        <div className="text-lg text-slate-200 mb-2">请先登录</div>
-        <p className="text-sm text-slate-400 mb-6">错题本功能仅对登录用户可用。</p>
-        <Link
-          to="/login"
-          className="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-sm"
-        >
-          去登录
-        </Link>
+        <div className="text-lg text-theme-secondary mb-2">请先登录</div>
+        <p className="text-sm text-theme-muted mb-6">错题本功能仅对登录用户可用。</p>
       </div>
     );
   }
@@ -54,23 +46,15 @@ export default function WrongBook() {
     }
   };
 
-  const goPracticeWrong = () => {
-    if (visible.length === 0) return;
-    // 将错题 ID 作为参数打开练习模式（简单方案：存到 localStorage，在 Practice 中读取）
-    const ids = visible.map((v) => (v.question as Question).id).join(',');
-    localStorage.setItem('practice_wrong_ids', ids);
-    navigate('/practice');
-  };
-
   return (
     <div className="py-8 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-100 mb-1">错题本</h1>
-      <p className="text-sm text-slate-400 mb-6">
+      <h1 className="text-2xl font-bold text-theme-primary mb-1">错题本</h1>
+      <p className="text-sm text-theme-muted mb-6">
         共 {items.length} 条记录，未掌握 {items.filter((i) => !i.mastered).length} 条
       </p>
 
       <div className="flex flex-wrap gap-3 items-center mb-6">
-        <label className="inline-flex items-center gap-2 text-sm text-slate-300">
+        <label className="inline-flex items-center gap-2 text-sm text-theme-secondary">
           <input
             type="checkbox"
             checked={onlyNotMastered}
@@ -79,16 +63,9 @@ export default function WrongBook() {
           />
           只看未掌握
         </label>
-        <button
-          onClick={goPracticeWrong}
-          disabled={visible.length === 0}
-          className="px-4 py-2 text-sm bg-brand-600 hover:bg-brand-500 text-white rounded-md disabled:opacity-50"
-        >
-          批量重做错题
-        </button>
       </div>
 
-      {errorMsg && <div className="text-sm text-rose-400 mb-3">{errorMsg}</div>}
+      {errorMsg && <div className="text-sm text-rose-500 mb-3">{errorMsg}</div>}
 
       {loading ? (
         <Loading />
@@ -105,38 +82,33 @@ export default function WrongBook() {
             return (
               <div
                 key={item.id}
-                className="rounded-lg bg-slate-800/60 border border-slate-700 p-4"
+                className="rounded-lg border border-theme bg-theme-card p-4"
               >
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mb-2">
-                  <span className="px-2 py-0.5 rounded bg-slate-700 text-slate-200">
-                    {TYPE_LABEL[q.type]}
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-slate-700 text-slate-200">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-theme-muted mb-2">
+                  <span className="px-2 py-0.5 rounded bg-theme-input text-theme-secondary">
                     {DIFFICULTY_LABEL[q.difficulty]}
                   </span>
-                  <span className="text-rose-300">错误 {item.wrong_count} 次</span>
-                  <span className="text-slate-500">
+                  <span className="text-rose-600 dark:text-rose-400">错误 {item.wrong_count} 次</span>
+                  <span className="text-theme-muted">
                     最近：{new Date(item.last_wrong_at).toLocaleString('zh-CN')}
                   </span>
                   <button
                     onClick={() => toggle(item.id, item.mastered)}
-                    className={`px-2 py-0.5 rounded text-xs ml-auto ${
+                    className={`px-2 py-0.5 rounded text-xs ml-auto border ${
                       item.mastered
-                        ? 'bg-emerald-800/60 text-emerald-200 border border-emerald-700'
-                        : 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+                        ? 'bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-theme-input border-theme text-theme-secondary hover:bg-theme-hover'
                     }`}
                   >
                     {item.mastered ? '✓ 已掌握' : '标记掌握'}
                   </button>
                 </div>
-                <div className="text-slate-100 leading-relaxed whitespace-pre-wrap">
-                  {q.question}
-                </div>
-                <div className="mt-3 text-sm text-slate-400">
-                  答案：<span className="text-emerald-300">{q.answer}</span>
+                <div className="text-theme-primary leading-relaxed whitespace-pre-wrap">{q.question}</div>
+                <div className="mt-3 text-sm text-theme-muted">
+                  答案：<span className="text-emerald-600 dark:text-emerald-300">{q.answer}</span>
                 </div>
                 {q.explanation && (
-                  <div className="mt-2 text-sm text-slate-400">解析：{q.explanation}</div>
+                  <div className="mt-2 text-sm text-theme-muted">解析：{q.explanation}</div>
                 )}
               </div>
             );

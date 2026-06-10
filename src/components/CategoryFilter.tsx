@@ -36,13 +36,13 @@ export default function CategoryFilter({
           placeholder="搜索题干关键字..."
           value={keyword ?? ''}
           onChange={(e) => onKeywordChange?.(e.target.value)}
-          className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-brand-500"
+          className="input-theme flex-1"
         />
       )}
       <select
         value={selectedCategory ?? ''}
         onChange={(e) => onCategoryChange?.(e.target.value)}
-        className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-brand-500"
+        className="input-theme"
       >
         <option value="">全部分类</option>
         {categories.map((c) => (
@@ -57,7 +57,7 @@ export default function CategoryFilter({
           const v = e.target.value;
           onDifficultyChange?.(v === '' ? '' : (Number(v) as Difficulty));
         }}
-        className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-brand-500"
+        className="input-theme"
       >
         <option value="">全部难度</option>
         {([1, 2, 3] as Difficulty[]).map((d) => (
@@ -70,7 +70,7 @@ export default function CategoryFilter({
         <select
           value={selectedType ?? ''}
           onChange={(e) => onTypeChange?.(e.target.value as QuestionType | '')}
-          className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-brand-500"
+          className="input-theme"
         >
           <option value="">全部题型</option>
           <option value="choice">{TYPE_LABEL.choice}</option>

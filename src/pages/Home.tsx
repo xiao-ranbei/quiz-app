@@ -25,7 +25,7 @@ export default function Home() {
     <div className="py-8 md:py-12">
       <section className="text-center mb-10">
         <h1 className="text-3xl md:text-4xl font-bold text-theme-primary mb-3">
-          高效刷题 · <span className="text-brand-300">AI 辅助</span>
+          高效刷题 · <span className="text-brand-600 dark:text-brand-300">AI 辅助</span>
         </h1>
         <p className="text-theme-muted max-w-xl mx-auto">
           支持选择题、填空题，按分类和难度筛选，内置练习模式和考试模式，错题本自动收录。
@@ -41,7 +41,7 @@ export default function Home() {
           </Link>
           <Link
             to="/exam"
-            className="px-5 py-2.5 bg-theme-card hover-theme text-theme-primary rounded-lg text-sm font-medium border border-theme"
+            className="px-5 py-2.5 bg-theme-card hover:bg-theme-hover text-theme-primary rounded-lg text-sm font-medium border border-theme"
           >
             <span className="inline-flex items-center gap-2">
               <Trophy className="w-4 h-4" /> 模拟考试
@@ -49,7 +49,7 @@ export default function Home() {
           </Link>
           <Link
             to="/submit"
-            className="px-5 py-2.5 bg-theme-card hover-theme text-theme-primary rounded-lg text-sm font-medium border border-theme"
+            className="px-5 py-2.5 bg-theme-card hover:bg-theme-hover text-theme-primary rounded-lg text-sm font-medium border border-theme"
           >
             <span className="inline-flex items-center gap-2">
               <Sparkles className="w-4 h-4" /> AI 出题
@@ -59,20 +59,20 @@ export default function Home() {
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
-        <div className="rounded-xl bg-theme-card border border-theme p-5">
-          <div className="text-3xl text-brand-300 font-bold mb-1">
+        <div className="rounded-xl bg-theme-card border border-theme p-5 text-center">
+          <div className="text-3xl text-brand-600 dark:text-brand-300 font-bold mb-1">
             {loading ? '—' : total.toLocaleString()}
           </div>
           <div className="text-sm text-theme-muted">题库题目</div>
         </div>
-        <div className="rounded-xl bg-theme-card border border-theme p-5">
-          <div className="text-3xl text-emerald-300 font-bold mb-1">
+        <div className="rounded-xl bg-theme-card border border-theme p-5 text-center">
+          <div className="text-3xl text-emerald-700 dark:text-emerald-300 font-bold mb-1">
             {loading ? '—' : categories.length}
           </div>
           <div className="text-sm text-theme-muted">题目分类</div>
         </div>
-        <div className="rounded-xl bg-theme-card border border-theme p-5">
-          <div className="text-3xl text-amber-300 font-bold mb-1 flex items-center gap-2">
+        <div className="rounded-xl bg-theme-card border border-theme p-5 text-center">
+          <div className="text-3xl text-amber-600 dark:text-amber-300 font-bold mb-1 flex items-center gap-2 justify-center">
             <ClipboardCheck className="w-7 h-7" />
           </div>
           <div className="text-sm text-theme-muted">可在个人中心配置 AI 解析</div>
@@ -87,7 +87,7 @@ export default function Home() {
               <Link
                 key={c.id}
                 to={`/practice?category=${c.id}`}
-                className="rounded-lg bg-theme-card border border-theme p-4 text-theme-secondary hover:border-brand-500 hover:text-brand-300"
+                className="rounded-lg bg-theme-card border border-theme p-4 text-theme-secondary hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-300 text-center"
               >
                 {c.name}
               </Link>

@@ -42,11 +42,11 @@ export default function Navbar() {
   };
 
   return (
-    <header className="dark:bg-slate-900/90 bg-white/90 border-b dark:border-slate-700 border-slate-200 sticky top-0 z-40 backdrop-blur">
+    <header className="bg-theme-card border-b border-theme sticky top-0 z-40 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 dark:text-brand-400 text-brand-600 hover:opacity-80">
+        <Link to="/" className="flex items-center gap-2 text-brand-600 dark:text-brand-300 hover:opacity-80">
           <BookOpen className="w-6 h-6" />
-          <span className="font-semibold text-lg dark:text-slate-100 text-slate-900">刷题平台</span>
+          <span className="font-semibold text-lg text-theme-primary">刷题平台</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
@@ -59,7 +59,7 @@ export default function Navbar() {
                 `px-3 py-2 rounded-md text-sm transition-colors ${
                   isActive
                     ? 'bg-brand-600 text-white'
-                    : 'dark:text-slate-300 text-slate-600 dark:hover:text-white dark:hover:bg-slate-800 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-hover'
                 }`
               }
             >
@@ -71,20 +71,20 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-2">
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-md transition-colors dark:text-slate-400 text-slate-500 dark:hover:bg-slate-800 hover:bg-slate-100"
+            className="p-2 rounded-md transition-colors text-theme-secondary hover:text-theme-primary hover:bg-theme-hover"
             title={isDark ? '切换到浅色模式' : '切换到深色模式'}
           >
             {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
           {user ? (
             <>
-              <span className="text-sm dark:text-slate-300 text-slate-600 flex items-center gap-1">
+              <span className="text-sm text-theme-secondary flex items-center gap-1">
                 <User className="w-4 h-4" />
                 {user.email?.split('@')[0]}
               </span>
               <button
                 onClick={handleSignOut}
-                className="px-3 py-1.5 text-sm rounded-md dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className="px-3 py-1.5 text-sm rounded-md bg-theme-hover text-theme-secondary hover:text-theme-primary"
               >
                 <span className="inline-flex items-center gap-1">
                   <LogOut className="w-4 h-4" /> 退出
@@ -104,7 +104,7 @@ export default function Navbar() {
         </div>
 
         <button
-          className="md:hidden dark:text-slate-300 text-slate-600"
+          className="md:hidden text-theme-secondary"
           onClick={() => setMenuOpen((v) => !v)}
           aria-label="切换菜单"
         >
@@ -113,7 +113,7 @@ export default function Navbar() {
       </div>
 
       {menuOpen && (
-        <div className="md:hidden border-t dark:border-slate-700 border-slate-200">
+        <div className="md:hidden border-t border-theme">
           <nav className="flex flex-col p-3 gap-1">
             {navItems.map((item) => (
               <NavLink
@@ -125,24 +125,24 @@ export default function Navbar() {
                   `px-3 py-2 rounded-md text-sm ${
                     isActive
                       ? 'bg-brand-600 text-white'
-                      : 'dark:text-slate-300 text-slate-600 dark:hover:bg-slate-800 hover:bg-slate-100'
+                      : 'text-theme-secondary hover:text-theme-primary hover:bg-theme-hover'
                   }`
                 }
               >
                 {item.label}
               </NavLink>
             ))}
-            <div className="mt-2 pt-2 border-t dark:border-slate-700 border-slate-200 flex items-center gap-2">
+            <div className="mt-2 pt-2 border-t border-theme flex items-center gap-2">
               <button
                 onClick={toggleTheme}
-                className="p-2 rounded-md dark:text-slate-400 text-slate-500 dark:hover:bg-slate-800 hover:bg-slate-100"
+                className="p-2 rounded-md text-theme-secondary hover:text-theme-primary hover:bg-theme-hover"
               >
                 {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
               {user ? (
                 <button
                   onClick={handleSignOut}
-                  className="flex-1 px-3 py-2 text-sm rounded-md dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  className="flex-1 px-3 py-2 text-sm rounded-md bg-theme-hover text-theme-secondary hover:text-theme-primary"
                 >
                   退出登录
                 </button>
