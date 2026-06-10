@@ -209,7 +209,9 @@ export default function SubmitQuestion() {
     { key: "ai", label: "AI 出题" },
   ];
 
-  const allOptionKeys = form.type === "multiple" ? ["A", "B", "C", "D", "E", "F"] : ["A", "B", "C", "D"];
+  const allOptionKeys: (keyof OptionsInput)[] = form.type === "multiple"
+    ? ["A", "B", "C", "D", "E", "F"]
+    : ["A", "B", "C", "D"];
 
   return (
     <div className="py-8 max-w-3xl mx-auto">
@@ -324,11 +326,11 @@ export default function SubmitQuestion() {
                     </label>
                     <input
                       id={`option-${key}`}
-                      value={form.options[key]}
+                      value={form.options[key] ?? ''}
                       onChange={(e) =>
                         setForm({
                           ...form,
-                          options: { ...form.options, [key]: e.target.value },
+                          options: { ...form.options, [key]: e.target.value } as OptionsInput,
                         })
                       }
                       placeholder={`选项 ${key}`}
