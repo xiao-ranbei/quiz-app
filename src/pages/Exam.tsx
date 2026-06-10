@@ -72,11 +72,17 @@ export default function Exam() {
   const handleSubmitExam = async () => {
     if (exam.submitted) return;
     exam.submit();
+    // 标准化答案：多选题按字符排序去重比较；其他做 trim
+    const normalize = (a: string, type: QuestionType) => {
+      const cleaned = a.trim().toLowerCase().replace(/\s+/g, '');
+      if (type === 'multiple') {
+        return Array.from(new Set(cleaned.split(''))).sort().join('');
+      }
+      return cleaned;
+    };
     const answers = exam.questions.map((q) => {
       const ua = exam.userAnswers[q.id] ?? '';
-      const isCorrect =
-        ua.trim().toLowerCase().replace(/\s+/g, '') ===
-        q.answer.trim().toLowerCase().replace(/\s+/g, '');
+      const isCorrect = normalize(ua, q.type) === normalize(q.answer, q.type);
       return { questionId: q.id, userAnswer: ua, isCorrect };
     });
     if (user) {
@@ -107,10 +113,16 @@ export default function Exam() {
 
   const stats = useMemo(() => {
     if (!exam.submitted) return null;
+    const normalize = (a: string, type: QuestionType) => {
+      const cleaned = a.trim().toLowerCase().replace(/\s+/g, '');
+      if (type === 'multiple') {
+        return Array.from(new Set(cleaned.split(''))).sort().join('');
+      }
+      return cleaned;
+    };
     const answers = exam.questions.map((q) => {
       const ua = exam.userAnswers[q.id] ?? '';
-      return ua.trim().toLowerCase().replace(/\s+/g, '') ===
-        q.answer.trim().toLowerCase().replace(/\s+/g, '');
+      return normalize(ua, q.type) === normalize(q.answer, q.type);
     });
     const correct = answers.filter(Boolean).length;
     return { correct, total: exam.questions.length, percent: Math.round((correct / exam.questions.length) * 100) };

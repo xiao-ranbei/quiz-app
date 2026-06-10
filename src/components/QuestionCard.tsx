@@ -50,14 +50,25 @@ export default function QuestionCard({
   const handleChoice = (key: string) => {
     if (isRevealed) return;
     if (question.type === 'multiple') {
-      const newSelected = selectedOptions.includes(key)
-        ? selectedOptions.filter(k => k !== key)
-        : [...selectedOptions, key].sort();
-      setSelectedOptions(newSelected);
-      onAnswerChange?.(newSelected.join(''));
+      // 仅更新选中状态，不触发提交，避免点击一次就"自动提交"
+      setSelectedOptions((prev) => {
+        const next = prev.includes(key)
+          ? prev.filter((k) => k !== key)
+          : [...prev, key].sort();
+        // exam 模式下实时保存当前选择作为草稿
+        if (mode === 'exam') {
+          onAnswerChange?.(next.join(''));
+        }
+        return next;
+      });
     } else {
       onAnswerChange?.(key);
     }
+  };
+
+  const handleMultiSubmit = () => {
+    if (isRevealed || selectedOptions.length === 0) return;
+    onAnswerChange?.(selectedOptions.join(''));
   };
 
   const handleFillSubmit = (e: React.FormEvent) => {
@@ -68,15 +79,19 @@ export default function QuestionCard({
 
   const handleMultiSelectAll = () => {
     if (isRevealed || !question.options) return;
-    const allOptions = Object.keys(question.options);
+    const allOptions = Object.keys(question.options).sort();
     setSelectedOptions(allOptions);
-    onAnswerChange?.(allOptions.join(''));
+    if (mode === 'exam') {
+      onAnswerChange?.(allOptions.join(''));
+    }
   };
 
   const handleMultiClear = () => {
     if (isRevealed) return;
     setSelectedOptions([]);
-    onAnswerChange?.('');
+    if (mode === 'exam') {
+      onAnswerChange?.('');
+    }
   };
 
   return (
@@ -181,6 +196,18 @@ export default function QuestionCard({
               );
             })}
           </div>
+          {!isRevealed && mode === 'practice' && onAnswerChange && (
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={handleMultiSubmit}
+                disabled={selectedOptions.length === 0}
+                className="px-4 py-2 text-sm rounded-md bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                提交答案
+              </button>
+            </div>
+          )}
         </div>
       )}
 

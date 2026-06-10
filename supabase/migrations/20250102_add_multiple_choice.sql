@@ -38,7 +38,7 @@ alter table user_history add constraint user_history_mode_check
 -- ===== 分类管理权限（管理员可增删）=====
 drop policy if exists "admin users can insert categories" on categories;
 create policy "admin users can insert categories" on categories for insert to authenticated
-  using (auth.jwt() ->> 'email' = 'xiao_ranbei@outlook.com');
+  with check (auth.jwt() ->> 'email' = 'xiao_ranbei@outlook.com');
 
 drop policy if exists "admin users can delete categories" on categories;
 create policy "admin users can delete categories" on categories for delete to authenticated

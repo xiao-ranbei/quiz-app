@@ -120,7 +120,7 @@ drop policy if exists "categories are viewable by everyone" on categories;
 create policy "categories are viewable by everyone" on categories for select using (true);
 drop policy if exists "admin users can insert categories" on categories;
 create policy "admin users can insert categories" on categories for insert to authenticated
-  using (auth.jwt() ->> 'email' = 'xiao_ranbei@outlook.com');
+  with check (auth.jwt() ->> 'email' = 'xiao_ranbei@outlook.com');
 drop policy if exists "admin users can delete categories" on categories;
 create policy "admin users can delete categories" on categories for delete to authenticated
   using (auth.jwt() ->> 'email' = 'xiao_ranbei@outlook.com');

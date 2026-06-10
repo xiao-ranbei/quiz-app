@@ -105,6 +105,20 @@ export async function deleteCategory(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function updateQuestion(
+  id: string,
+  updates: Partial<Pick<Question, 'category_id' | 'difficulty' | 'type' | 'question' | 'options' | 'answer' | 'explanation' | 'reference_url'>>,
+): Promise<Question> {
+  const { data, error } = await supabase
+    .from('questions')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Question;
+}
+
 export async function getCategoryByName(name: string): Promise<Category | null> {
   const { data, error } = await supabase
     .from('categories')

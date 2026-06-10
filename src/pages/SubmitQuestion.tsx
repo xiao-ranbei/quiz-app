@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Plus, Trash2, X } from "lucide-react";
 import type { Category, Difficulty, QuestionType } from "../types";
 import { DIFFICULTY_LABEL, TYPE_LABEL } from "../types";
 import {
@@ -6,6 +7,8 @@ import {
   insertQuestionsBulk,
   getCategories,
   getOrCreateCategory,
+  deleteCategory,
+  isCurrentUserAdmin,
 } from "../lib/questions";
 import { useAuthStore } from "../store/authStore";
 import { generateQuestions } from "../lib/ai";
@@ -66,9 +69,15 @@ export default function SubmitQuestion() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<string>("");
   const [batchErrors, setBatchErrors] = useState<string[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showAddCat, setShowAddCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [deletingCat, setDeletingCat] = useState<string | null>(null);
+  const [catMsg, setCatMsg] = useState<string | null>(null);
 
   useEffect(() => {
     getCategories().then(setCategories);
+    isCurrentUserAdmin().then(setIsAdmin);
   }, []);
 
   if (!user) {
@@ -79,6 +88,41 @@ export default function SubmitQuestion() {
       </div>
     );
   }
+
+  const handleAddCategory = async () => {
+    if (!newCatName.trim()) return;
+    setCatMsg(null);
+    try {
+      const cat = await getOrCreateCategory(newCatName.trim());
+      setCategories((prev) => {
+        if (prev.some((c) => c.id === cat.id)) return prev;
+        return [...prev, cat];
+      });
+      setNewCatName("");
+      setShowAddCat(false);
+      setCatMsg(`分类 "${cat.name}" 已创建`);
+    } catch (e) {
+      setCatMsg(e instanceof Error ? e.message : "创建失败");
+    }
+  };
+
+  const handleDeleteCategory = async (cat: Category) => {
+    if (!confirm(`确定删除分类 "${cat.name}"？`)) return;
+    setDeletingCat(cat.id);
+    setCatMsg(null);
+    try {
+      await deleteCategory(cat.id);
+      setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+      if (form.categoryId === cat.id) {
+        setForm((f) => ({ ...f, categoryId: "" }));
+      }
+      setCatMsg(`分类 "${cat.name}" 已删除`);
+    } catch (e) {
+      setCatMsg(e instanceof Error ? e.message : "删除失败");
+    } finally {
+      setDeletingCat(null);
+    }
+  };
 
   const submitSingle = async () => {
     setMsg(null);
@@ -285,9 +329,74 @@ export default function SubmitQuestion() {
   return (
     <div className="py-8 max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold text-theme-primary mb-1">贡献题目</h1>
-      <p className="text-sm text-theme-muted mb-6">
+      <p className="text-sm text-theme-muted mb-4">
         你也可以在个人中心配置 AI，然后使用 AI 辅助生成题目或补充解析。
       </p>
+
+      {isAdmin && (
+        <div className="mb-6 p-4 rounded-xl border border-theme bg-theme-card">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-theme-secondary">分类管理</h2>
+            <button
+              onClick={() => setShowAddCat(true)}
+              className="px-3 py-1.5 text-xs bg-brand-600 hover:bg-brand-500 text-white rounded-md flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" /> 新增分类
+            </button>
+          </div>
+
+          {catMsg && (
+            <div className="mb-3 text-xs text-theme-muted bg-theme-input rounded p-2">{catMsg}</div>
+          )}
+
+          {showAddCat && (
+            <div className="mb-3 flex items-center gap-2">
+              <input
+                type="text"
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
+                placeholder="分类名称"
+                className="input-theme flex-1 text-sm"
+                autoFocus
+              />
+              <button
+                onClick={handleAddCategory}
+                className="px-3 py-1.5 text-xs bg-brand-600 hover:bg-brand-500 text-white rounded-md"
+              >
+                创建
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddCat(false);
+                  setNewCatName("");
+                }}
+                className="p-1.5 text-theme-muted hover:text-theme-secondary"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {categories.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center gap-1 px-2 py-1 rounded-md bg-theme-input text-sm text-theme-secondary"
+              >
+                {c.name}
+                <button
+                  onClick={() => handleDeleteCategory(c)}
+                  disabled={deletingCat === c.id}
+                  className="p-0.5 text-rose-600 hover:text-rose-500 disabled:opacity-40"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border border-theme bg-theme-card p-5">
         <div className="flex border-b border-theme mb-4">

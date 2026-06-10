@@ -73,8 +73,15 @@ export default function Practice() {
     setCurrentAnswer(ans);
     reveal();
     if (user && current) {
-      const isCorrect = ans.trim().toLowerCase().replace(/\s+/g, '') ===
-        current.answer.trim().toLowerCase().replace(/\s+/g, '');
+      // 标准化：多选题按字符排序去重比较；其他题目做 trim 比较
+      const normalize = (a: string) => {
+        const cleaned = a.trim().toLowerCase().replace(/\s+/g, '');
+        if (current.type === 'multiple') {
+          return Array.from(new Set(cleaned.split(''))).sort().join('');
+        }
+        return cleaned;
+      };
+      const isCorrect = normalize(ans) === normalize(current.answer);
       try {
         await savePracticeRecord({
           questionId: current.id,
