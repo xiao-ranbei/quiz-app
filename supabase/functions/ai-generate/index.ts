@@ -6,6 +6,7 @@ interface RequestBody {
   count?: number;
   difficulty?: 1 | 2 | 3;
   type?: 'choice' | 'fill';
+  category_id?: string;
 }
 
 interface GeneratedQuestion {
@@ -16,9 +17,12 @@ interface GeneratedQuestion {
 }
 
 Deno.serve(async (req) => {
+  const startTime = Date.now();
   try {
     const body: RequestBody = await req.json();
-    const { topic, count = 3, difficulty = 2, type = 'choice' } = body;
+    const { topic, count = 3, difficulty = 2, type = 'choice', category_id } = body;
+
+    console.log(`[ai-generate] 请求开始 - topic: ${topic}, count: ${count}, type: ${type}`);
 
     if (!topic) {
       return new Response(JSON.stringify({ error: '请提供题目主题' }), {
@@ -27,13 +31,32 @@ Deno.serve(async (req) => {
       });
     }
 
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('[ai-generate] 环境变量未配置');
+      return new Response(JSON.stringify({ error: '服务配置错误' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      supabaseUrl,
+      supabaseKey,
       { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } },
     );
 
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData, error: authError } = await supabase.auth.getUser();
+    if (authError) {
+      console.error('[ai-generate] 用户认证失败:', authError.message);
+      return new Response(JSON.stringify({ error: '用户认证失败: ' + authError.message }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    
     if (!userData.user) {
       return new Response(JSON.stringify({ error: '请先登录' }), {
         status: 401,
@@ -41,11 +64,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: configData } = await supabase
+    const { data: configData, error: configError } = await supabase
       .from('user_ai_configs')
       .select('api_base_url, api_key, model')
       .eq('user_id', userData.user.id)
       .single();
+
+    if (configError) {
+      console.error('[ai-generate] 配置查询失败:', configError.message);
+      return new Response(JSON.stringify({ error: '获取 AI 配置失败: ' + configError.message }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!configData) {
       return new Response(JSON.stringify({ error: '请先在个人中心配置 AI API' }), {
@@ -91,12 +122,12 @@ Deno.serve(async (req) => {
 }`;
     }
 
+    console.log(`[ai-generate] 调用 AI - model: ${configData.model}, baseUrl: ${configData.api_base_url}`);
     const raw = await callAI(configData, [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: schemaPrompt },
     ]);
 
-    // 处理 AI 可能返回的 markdown 代码块
     const cleaned = raw
       .replace(/```json/gi, '')
       .replace(/```/g, '')
@@ -106,6 +137,7 @@ Deno.serve(async (req) => {
     try {
       parsed = JSON.parse(cleaned);
     } catch {
+      console.error('[ai-generate] JSON 解析失败:', raw);
       return new Response(
         JSON.stringify({ error: 'AI 返回的 JSON 无法解析，请重试', raw }),
         { status: 502, headers: { 'Content-Type': 'application/json' } },
@@ -113,25 +145,32 @@ Deno.serve(async (req) => {
     }
 
     if (!Array.isArray(parsed.questions)) {
+      console.error('[ai-generate] AI 未返回题目数组:', raw);
       return new Response(
         JSON.stringify({ error: 'AI 未返回题目数组，请调整提示词并重试', raw }),
         { status: 502, headers: { 'Content-Type': 'application/json' } },
       );
     }
 
-    // 标准化类型字段，方便前端直接入库
     const questions = parsed.questions.map((q) => ({
       ...q,
       type,
       difficulty,
+      category_id,
     }));
 
+    const duration = Date.now() - startTime;
+    console.log(`[ai-generate] 请求完成 - 耗时: ${duration}ms, 生成题目数: ${questions.length}`);
+    
     return new Response(JSON.stringify({ questions }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    const duration = Date.now() - startTime;
+    console.error(`[ai-generate] 请求失败 - 耗时: ${duration}ms, 错误: ${message}`);
+    
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
