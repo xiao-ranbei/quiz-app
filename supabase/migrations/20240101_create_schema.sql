@@ -14,7 +14,7 @@ create table if not exists questions (
   id uuid primary key default gen_random_uuid(),
   category_id uuid references categories(id) on delete set null,
   difficulty smallint not null check (difficulty in (1, 2, 3)),
-  type text not null check (type in ('choice', 'fill')),
+  type text not null check (type in ('choice', 'multiple', 'fill')),
   question text not null,
   options jsonb,
   answer text not null,

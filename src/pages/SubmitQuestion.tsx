@@ -104,7 +104,7 @@ export default function SubmitQuestion() {
         ? form.answer.trim()
         : form.answer.trim().toUpperCase().replace(/[^A-F]/g, "");
       await insertQuestion({
-        category_id: form.categoryId,
+        category_id: form.categoryId || undefined,
         difficulty: form.difficulty,
         type: form.type,
         question: form.question.trim(),
@@ -155,9 +155,18 @@ export default function SubmitQuestion() {
     }
     setSubmitting(true);
     try {
-      const items: unknown[] = JSON.parse(batchJson);
+      let items: unknown[];
+      try {
+        items = JSON.parse(batchJson);
+      } catch (parseErr) {
+        const hint = parseErr instanceof Error
+          ? `JSON 解析失败：${parseErr.message}`
+          : 'JSON 解析失败，请检查格式';
+        setMsg(hint);
+        return;
+      }
       if (!Array.isArray(items)) {
-        setMsg("JSON 必须是数组格式");
+        setMsg("JSON 必须是数组格式，用 [ ... ] 包裹");
         return;
       }
       if (items.length === 0) {
@@ -177,20 +186,27 @@ export default function SubmitQuestion() {
         return;
       }
       const questions = (items as BatchQuestion[]).map((item) => ({
-        ...item,
-        category_id: item.category_id || form.categoryId,
+        category_id: (item.category_id || form.categoryId) || undefined,
         difficulty: item.difficulty || form.difficulty,
+        type: item.type,
+        question: item.question.trim(),
         answer: item.type === 'fill'
           ? item.answer.trim()
           : item.answer.trim().toUpperCase().replace(/[^A-F]/g, ""),
         options: normalizeOptions(item.options),
+        explanation: item.explanation?.trim() || undefined,
       }));
       await insertQuestionsBulk(questions);
       setMsg(`成功导入 ${questions.length} 道题目`);
       setBatchJson("");
       setBatchErrors([]);
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "JSON 解析失败或导入出错");
+      const msg = e instanceof Error
+        ? e.message
+        : (typeof e === 'object' && e !== null && 'message' in e && typeof (e as { message: unknown }).message === 'string')
+          ? (e as { message: string }).message
+          : 'JSON 解析失败或导入出错';
+      setMsg(msg);
     } finally {
       setSubmitting(false);
     }
