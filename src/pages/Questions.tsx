@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Pencil, Trash2, X } from 'lucide-react';
 import { DIFFICULTY_LABEL, TYPE_LABEL } from '../types';
 import type { Category, Difficulty, Question, QuestionType } from '../types';
-import { getCategories, getQuestions, deleteQuestion, updateQuestion, isCurrentUserAdmin } from '../lib/questions';
+import { getCategories, getQuestions, deleteQuestion, deleteQuestionsBulk, updateQuestion, isCurrentUserAdmin } from '../lib/questions';
 import CategoryFilter from '../components/CategoryFilter';
 import Loading from '../components/Loading';
 import EmptyState from '../components/EmptyState';
@@ -252,7 +252,9 @@ export default function Questions() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
@@ -287,11 +289,51 @@ export default function Questions() {
     try {
       await deleteQuestion(id);
       setQuestions((qs) => qs.filter((q) => q.id !== id));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       setMsg({ ok: true, text: '题目已删除' });
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : '删除失败' });
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === questions.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(questions.map((q) => q.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!isAdmin) return;
+    if (selectedIds.size === 0) return;
+    if (!confirm(`确定删除选中的 ${selectedIds.size} 道题目吗？此操作无法撤销。`)) return;
+    setBulkDeleting(true);
+    setMsg(null);
+    try {
+      await deleteQuestionsBulk(Array.from(selectedIds));
+      setQuestions((qs) => qs.filter((q) => !selectedIds.has(q.id)));
+      setMsg({ ok: true, text: `已删除 ${selectedIds.size} 道题目` });
+      setSelectedIds(new Set());
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : '批量删除失败' });
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -362,6 +404,34 @@ export default function Questions() {
         onTypeChange={setType}
       />
 
+      {isAdmin && questions.length > 0 && (
+        <div className="flex items-center justify-between mb-4 p-3 rounded-lg bg-theme-card border border-theme">
+          <label className="flex items-center gap-2 text-sm text-theme-secondary cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={selectedIds.size === questions.length && questions.length > 0}
+              onChange={toggleSelectAll}
+              className="w-4 h-4 accent-brand-600"
+            />
+            <span>
+              全选（已选 <span className="font-medium text-brand-600">{selectedIds.size}</span> / {questions.length}）
+            </span>
+          </label>
+          <div className="flex items-center gap-2">
+            {selectedIds.size > 0 && (
+              <span className="text-xs text-theme-muted">点击题目左侧的勾选框可选择</span>
+            )}
+            <button
+              onClick={handleBulkDelete}
+              disabled={selectedIds.size === 0 || bulkDeleting}
+              className="px-3 py-1.5 text-sm rounded-md bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {bulkDeleting ? '删除中...' : `批量删除 (${selectedIds.size})`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <Loading />
       ) : loadError ? (
@@ -373,9 +443,19 @@ export default function Questions() {
           {questions.map((q) => (
             <div
               key={q.id}
-              className="rounded-lg bg-theme-card border border-theme p-4 hover:border-theme-muted transition-colors"
+              className={`rounded-lg bg-theme-card border p-4 hover:border-theme-muted transition-colors ${
+                selectedIds.has(q.id) ? 'border-brand-500 bg-brand-500/5' : 'border-theme'
+              }`}
             >
               <div className="flex items-start justify-between gap-4">
+                {isAdmin && (
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(q.id)}
+                    onChange={() => toggleSelect(q.id)}
+                    className="mt-1 w-4 h-4 accent-brand-600 shrink-0 cursor-pointer"
+                  />
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-xs text-theme-muted mb-2">
                     <span className="px-2 py-0.5 rounded bg-theme-input text-theme-secondary">

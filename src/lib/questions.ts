@@ -279,12 +279,27 @@ const ADMIN_EMAILS = new Set(['xiao_ranbei@outlook.com']);
 
 /**
  * 判断当前登录用户是否为管理员
+ * 1) 检查 user_profiles 表是否标记为 admin
+ * 2) 或检查邮箱是否在白名单中
  */
 export async function isCurrentUserAdmin(): Promise<boolean> {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return false;
   const email = data.user.email?.toLowerCase() ?? '';
-  return ADMIN_EMAILS.has(email);
+  if (ADMIN_EMAILS.has(email)) return true;
+
+  // 尝试从 user_profiles 表读取 role_key（若迁移已启用）
+  try {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role_key')
+      .eq('id', data.user.id)
+      .maybeSingle();
+    if (profile && (profile as any).role_key === 'admin') return true;
+  } catch {
+    // 表不存在或无权限时忽略
+  }
+  return false;
 }
 
 /**
@@ -292,5 +307,14 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
  */
 export async function deleteQuestion(id: string): Promise<void> {
   const { error } = await supabase.from('questions').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/**
+ * 批量删除题目（仅管理员可操作）
+ */
+export async function deleteQuestionsBulk(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from('questions').delete().in('id', ids);
   if (error) throw error;
 }
