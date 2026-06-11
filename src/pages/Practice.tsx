@@ -51,17 +51,16 @@ export default function Practice() {
         limit: count,
         random: true,
       });
-      if (qs.length === 0) {
-        setErrorMsg('没有符合条件的题目，请调整筛选条件');
+      if (!qs || qs.length === 0) {
+        setErrorMsg('题库中没有符合条件的题目，请先在 Supabase 中导入题库或调整筛选条件。');
+        setLoading(false);
         return;
       }
       setQuestions(qs);
-      start(qs);
-      setCurrentAnswer('');
       setStarted(true);
+      start(qs);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setErrorMsg('加载失败: ' + msg);
+      setErrorMsg(e instanceof Error ? e.message : '读取题库失败，请稍后再试。');
     } finally {
       setLoading(false);
     }
