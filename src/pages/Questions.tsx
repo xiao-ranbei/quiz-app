@@ -288,9 +288,25 @@ export default function Questions() {
   };
 
   const handleSave = async (id: string, updates: Partial<Question>) => {
-    const updated = await updateQuestion(id, updates);
-    setQuestions((qs) => qs.map((q) => (q.id === id ? updated : q)));
-    setMsg({ ok: true, text: '题目已保存' });
+    try {
+      const updated = await updateQuestion(id, updates);
+      // 保存成功后，从当前列表中替换该题目。
+      // 如果修改了分类/难度/题型，导致该题不再匹配当前筛选条件，
+      // useEffect 会在筛选条件变化时自动重新拉取数据。
+      setQuestions((qs) => qs.map((q) => (q.id === id ? updated : q)));
+      setMsg({ ok: true, text: '题目已保存' });
+      // 保存后主动重新拉取一次，确保与服务器数据完全一致
+      getQuestions({
+        categoryId: categoryId || undefined,
+        difficulty: difficulty || undefined,
+        type: type || undefined,
+        keyword: keyword || undefined,
+      }).then(setQuestions);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '保存失败';
+      setMsg({ ok: false, text: '保存失败：' + msg });
+      throw e;
+    }
   };
 
   const catMap = useMemo(() => {
