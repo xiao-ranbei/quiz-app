@@ -250,6 +250,7 @@ export default function Questions() {
   const [difficulty, setDifficulty] = useState<Difficulty | ''>('');
   const [type, setType] = useState<QuestionType | ''>('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -261,13 +262,20 @@ export default function Questions() {
 
   useEffect(() => {
     setLoading(true);
+    setLoadError(null);
     getQuestions({
       categoryId: categoryId || undefined,
       difficulty: difficulty || undefined,
       type: type || undefined,
       keyword: keyword || undefined,
     })
-      .then(setQuestions)
+      .then((qs) => {
+        setQuestions(qs);
+        setLoadError(null);
+      })
+      .catch((e) => {
+        setLoadError(e instanceof Error ? e.message : '加载失败');
+      })
       .finally(() => setLoading(false));
   }, [categoryId, difficulty, type, keyword]);
 
@@ -356,6 +364,8 @@ export default function Questions() {
 
       {loading ? (
         <Loading />
+      ) : loadError ? (
+        <EmptyState title="加载失败" hint={loadError} />
       ) : questions.length === 0 ? (
         <EmptyState title="没有符合条件的题目" hint="尝试修改筛选条件" />
       ) : (

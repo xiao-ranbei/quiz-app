@@ -31,7 +31,7 @@ export async function getQuestions(params: {
   if (params.categoryId) query = query.eq('category_id', params.categoryId);
   if (params.difficulty) query = query.eq('difficulty', params.difficulty);
   if (params.type) query = query.eq('type', params.type);
-  if (params.keyword) query = query.ilike('question', `%${params.keyword}%`);
+  if (params.keyword) query = query.ilike('"question"', `%${params.keyword}%`);
 
   if (params.random) {
     // PostgREST 不支持 order('random()')，改为前端打乱
