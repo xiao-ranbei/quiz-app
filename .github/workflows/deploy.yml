@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages + Supabase
 
 on:
   push:
@@ -15,7 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  # ---------- 1. 前端：构建 ----------
+  build-frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,12 +36,42 @@ jobs:
         with:
           path: dist
 
-  deploy:
+  # ---------- 2. 前端：部署到 GitHub Pages ----------
+  deploy-pages:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: build-frontend
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # ---------- 3. Supabase Edge Functions + SQL 迁移 ----------
+  deploy-supabase:
+    runs-on: ubuntu-latest
+    # Edge Functions 不依赖前端构建结果，可并行进行
+    needs: []
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        run: |
+          wget -O supabase.deb https://github.com/supabase/cli/releases/download/v1.222.4/supabase_1.222.4_linux_amd64.deb
+          sudo dpkg -i supabase.deb
+          rm supabase.deb
+          supabase --version
+
+      - name: Push SQL Migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: supabase db push
+        continue-on-error: true
+
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: supabase functions deploy --project-ref $SUPABASE_PROJECT_ID
