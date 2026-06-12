@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { DIFFICULTY_LABEL, TYPE_LABEL } from '../types';
 import type { Question } from '../types';
+import MarkdownText from './MarkdownText';
 
 interface Props {
   question: Question;
@@ -244,57 +245,62 @@ export default function QuestionCard({
               {isCorrect ? '✓ 回答正确' : '✗ 回答错误'}
             </div>
             <div className="text-sm text-theme-secondary">正确答案：{question.answer}</div>
-            {question.explanation && (
-              <div className="mt-2 text-sm text-theme-secondary">解析：{question.explanation}</div>
+            {(question.explanation || aiResolution) && (
+              <div className="mt-3 text-sm">
+                {question.explanation && (
+                  <div className="mb-3">
+                    <div className="text-theme-muted text-xs mb-1">题目解析</div>
+                    <MarkdownText
+                      text={question.explanation}
+                      className="text-theme-secondary leading-relaxed"
+                    />
+                  </div>
+                )}
+                {aiResolution && (
+                  <div className="rounded-lg p-3 border border-brand-500/50 bg-brand-500/5">
+                    <div className="text-brand-700 dark:text-brand-300 text-xs font-semibold mb-1">
+                      AI 智能解析
+                    </div>
+                    <MarkdownText
+                      text={aiResolution}
+                      className="text-theme-secondary leading-relaxed"
+                    />
+                  </div>
+                )}
+              </div>
             )}
           </div>
-
-          {aiResolution && (
-            <div className="rounded-lg p-4 border border-brand-500/60 bg-brand-500/10">
-              <div className="text-sm font-semibold text-brand-700 dark:text-brand-200 mb-1">
-                AI 智能解析
-              </div>
-              <div className="text-sm text-theme-secondary whitespace-pre-wrap leading-relaxed">
-                {aiResolution}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {!isRevealed && mode === 'practice' && (
+      {/* AI 解析按钮：未作答时也可点击，点击后同时显示答案并请求 AI 解析 */}
+      {mode === 'practice' && showAIBtn && onAskAI && (
         <div className="mt-5 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={onReveal}
-            disabled={question.type === 'multiple' ? selectedOptions.length === 0 : !userAnswer}
-            className="px-4 py-2 text-sm rounded-md bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            查看答案
-          </button>
-          {showAIBtn && onAskAI && (
+          {!isRevealed && (
             <button
               type="button"
-              onClick={onAskAI}
-              disabled={aiLoading}
-              className="px-4 py-2 text-sm rounded-md border border-theme text-theme-secondary hover:bg-theme-hover disabled:opacity-50"
+              onClick={onReveal}
+              disabled={question.type === 'multiple' ? selectedOptions.length === 0 : !userAnswer}
+              className="px-4 py-2 text-sm rounded-md bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {aiLoading ? 'AI 解析中...' : '问 AI 解析'}
+              查看答案
             </button>
           )}
-        </div>
-      )}
-
-      {aiResolution && isRevealed && showAIBtn && onAskAI && !aiResolution && (
-        <div className="mt-3">
           <button
             type="button"
             onClick={onAskAI}
             disabled={aiLoading}
-            className="px-4 py-2 text-sm rounded-md border border-theme text-theme-secondary hover:bg-theme-hover"
+            className="px-4 py-2 text-sm rounded-md border border-brand-500/60 bg-brand-500/10 text-brand-700 dark:text-brand-200 hover:bg-brand-500/20 disabled:opacity-50"
           >
             {aiLoading ? 'AI 解析中...' : '问 AI 解析'}
           </button>
+        </div>
+      )}
+
+      {/* AI 解析加载中提示 */}
+      {aiLoading && (
+        <div className="mt-3 text-sm text-brand-500">
+          <span className="inline-block animate-pulse">正在调用 AI 模型，请稍候...</span>
         </div>
       )}
     </div>

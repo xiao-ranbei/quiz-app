@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Category, Difficulty, Question, QuestionType } from '../types';
-import { getCategories, getQuestions, savePracticeRecord } from '../lib/questions';
+import { getCategories, getQuestions, savePracticeRecord, updateQuestion } from '../lib/questions';
 import { resolveQuestionAI } from '../lib/ai';
 import { useAuthStore } from '../store/authStore';
 import { usePracticeStore } from '../store/practiceStore';
@@ -101,6 +101,10 @@ export default function Practice() {
 
   const handleAskAI = async () => {
     if (!current) return;
+    // 点击 AI 解析时自动显示答案（如果尚未作答则直接展示）
+    if (!showAnswer) {
+      reveal();
+    }
     setAiLoadingId(current.id);
     try {
       const { resolution } = await resolveQuestionAI({
@@ -108,6 +112,17 @@ export default function Practice() {
         userAnswer: currentAnswer,
       });
       setAiMap((m) => ({ ...m, [current.id]: resolution }));
+
+      // 将 AI 解析结果自动写入题目的 explanation 字段
+      try {
+        await updateQuestion(current.id, {
+          explanation: current.explanation
+            ? `${current.explanation}\n\n---\n\nAI 解析：\n${resolution}`
+            : resolution,
+        });
+      } catch (saveErr) {
+        console.warn('保存 AI 解析到题目失败（可能缺少更新权限）', saveErr);
+      }
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : 'AI 调用失败，请先在"我的"页面配置 AI API');
     } finally {
