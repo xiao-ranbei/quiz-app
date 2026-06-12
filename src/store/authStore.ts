@@ -20,15 +20,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   error: null,
   signIn: async (email, password) => {
     set({ error: null });
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       set({ error: error.message });
       throw error;
     }
+    // 登录成功后立即更新 store，触发页面跳转
+    set({ session: data.session ?? null, user: data.user ?? null, loading: false, error: null });
   },
   signUp: async (email, password) => {
     set({ error: null });
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: undefined },
@@ -36,6 +38,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (error) {
       set({ error: error.message });
       throw error;
+    }
+    // 注册成功后也更新 store（若 Supabase 自动登录）
+    if (data.session) {
+      set({ session: data.session, user: data.user ?? null, loading: false, error: null });
+    } else {
+      set({
+        error: '注册成功，请使用邮箱与密码登录。',
+      });
     }
   },
   setAuth: (session, user) => set({ session, user, loading: false, error: null }),

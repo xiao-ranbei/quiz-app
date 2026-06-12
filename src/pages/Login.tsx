@@ -1,18 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 
 export default function Login() {
-  const { signIn, signUp, error, loading } = useAuthStore();
+  const navigate = useNavigate();
+  const { signIn, signUp, error, loading, user } = useAuthStore();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  useEffect(() => {
+    if (user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (mode === 'login') {
-      await signIn(email, password);
+      try {
+        await signIn(email, password);
+      } catch {
+        // 错误会由 authStore.error 展示
+      }
     } else {
-      await signUp(email, password);
+      try {
+        await signUp(email, password);
+      } catch {
+        // 错误会由 authStore.error 展示
+      }
     }
   };
 
