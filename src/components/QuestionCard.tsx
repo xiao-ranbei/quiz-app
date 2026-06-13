@@ -273,27 +273,28 @@ export default function QuestionCard({
         </div>
       )}
 
-      {/* AI 解析按钮：未作答时也可点击，点击后同时显示答案并请求 AI 解析 */}
-      {mode === 'practice' && showAIBtn && onAskAI && (
+      {/* 按钮区：查看答案一直可点击；已解析过的题目禁用 AI 按钮 */}
+      {mode === 'practice' && (
         <div className="mt-5 flex flex-wrap gap-2">
-          {!isRevealed && (
+          {onReveal && (
             <button
               type="button"
               onClick={onReveal}
-              disabled={question.type === 'multiple' ? selectedOptions.length === 0 : !userAnswer}
-              className="px-4 py-2 text-sm rounded-md bg-brand-600 hover:bg-brand-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-sm rounded-md bg-brand-600 hover:bg-brand-500 text-white"
             >
               查看答案
             </button>
           )}
-          <button
-            type="button"
-            onClick={onAskAI}
-            disabled={aiLoading}
-            className="px-4 py-2 text-sm rounded-md border border-brand-500/60 bg-brand-500/10 text-brand-700 dark:text-brand-200 hover:bg-brand-500/20 disabled:opacity-50"
-          >
-            {aiLoading ? 'AI 解析中...' : '问 AI 解析'}
-          </button>
+          {showAIBtn && onAskAI && (
+            <button
+              type="button"
+              onClick={onAskAI}
+              disabled={!!aiResolution || aiLoading}
+              className="px-4 py-2 text-sm rounded-md border border-brand-500/60 bg-brand-500/10 text-brand-700 dark:text-brand-200 hover:bg-brand-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {aiResolution ? '已解析' : aiLoading ? 'AI 解析中...' : '问 AI 解析'}
+            </button>
+          )}
         </div>
       )}
 
