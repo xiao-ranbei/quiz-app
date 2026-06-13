@@ -285,7 +285,7 @@ export default function QuestionCard({
               查看答案
             </button>
           )}
-          {showAIBtn && onAskAI && (
+          {isRevealed && showAIBtn && onAskAI && (
             <button
               type="button"
               onClick={onAskAI}
