@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { Category, Difficulty, Question, QuestionType } from '../types';
 import { getCategories, getQuestions, savePracticeRecord, updateQuestion } from '../lib/questions';
 import { resolveQuestionAI } from '../lib/ai';
@@ -9,15 +10,41 @@ import CategoryFilter from '../components/CategoryFilter';
 import Loading from '../components/Loading';
 import EmptyState from '../components/EmptyState';
 
+const SESSION_KEY = 'practice_filters';
+
+function loadFilters(): {
+  keyword: string;
+  categoryId: string;
+  difficulty: Difficulty | '';
+  type: QuestionType | '';
+  count: number;
+} {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { keyword: '', categoryId: '', difficulty: '', type: '', count: 10 };
+}
+
+function saveFilters(f: ReturnType<typeof loadFilters>) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(f));
+  } catch {}
+}
+
 export default function Practice() {
+  const [searchParams] = useSearchParams();
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
-  const [keyword, setKeyword] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [difficulty, setDifficulty] = useState<Difficulty | ''>('');
-  const [type, setType] = useState<QuestionType | ''>('');
-  const [count, setCount] = useState(10);
+
+  // 从 sessionStorage 恢复筛选状态；URL 参数优先级最高
+  const [keyword, setKeyword] = useState(() => loadFilters().keyword);
+  const [categoryId, setCategoryId] = useState(() => searchParams.get('category') || loadFilters().categoryId);
+  const [difficulty, setDifficulty] = useState<Difficulty | ''>(() => loadFilters().difficulty);
+  const [type, setType] = useState<QuestionType | ''>(() => loadFilters().type);
+  const [count, setCount] = useState(() => loadFilters().count);
 
   const [started, setStarted] = useState(false);
   const [aiMap, setAiMap] = useState<Record<string, string>>({});
@@ -38,6 +65,11 @@ export default function Practice() {
   useEffect(() => {
     return () => reset();
   }, [reset]);
+
+  // 筛选状态变化时自动保存到 sessionStorage
+  useEffect(() => {
+    saveFilters({ keyword, categoryId, difficulty, type, count });
+  }, [keyword, categoryId, difficulty, type, count]);
 
   const startPractice = async () => {
     setErrorMsg('');
@@ -191,6 +223,7 @@ export default function Practice() {
         <button
           onClick={() => {
             setStarted(false);
+            sessionStorage.removeItem(SESSION_KEY);
             reset();
           }}
           className="text-sm text-theme-muted hover:text-theme-secondary"
