@@ -8,6 +8,7 @@ interface PracticeState {
   start: (questions: Question[]) => void;
   next: () => void;
   prev: () => void;
+  setIndex: (index: number) => void;
   reveal: () => void;
   reset: () => void;
 }
@@ -26,6 +27,10 @@ export const usePracticeStore = create<PracticeState>((set) => ({
     set((s) => ({
       currentIndex: Math.max(s.currentIndex - 1, 0),
       showAnswer: false,
+    })),
+  setIndex: (index) =>
+    set((s) => ({
+      currentIndex: Math.min(Math.max(index, 0), Math.max(s.queue.length - 1, 0)),
     })),
   reveal: () => set({ showAnswer: true }),
   reset: () => set({ queue: [], currentIndex: 0, showAnswer: false }),

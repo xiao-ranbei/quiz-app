@@ -49,6 +49,18 @@ export async function getQuestions(params: {
   return result;
 }
 
+export async function getQuestionsByIds(ids: string[]): Promise<Question[]> {
+  if (!ids.length) return [];
+  const { data, error } = await supabase
+    .from('questions')
+    .select('*')
+    .in('id', ids);
+  if (error) throw error;
+  // 按原始 id 顺序排列
+  const map = new Map((data ?? []).map((q) => [q.id, q]));
+  return ids.map((id) => map.get(id)).filter(Boolean) as Question[];
+}
+
 export async function getQuestionCount(params: {
   categoryId?: string;
   difficulty?: Difficulty;

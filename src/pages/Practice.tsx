@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Category, Difficulty, Question, QuestionType } from '../types';
-import { getCategories, getQuestions, savePracticeRecord, updateQuestion } from '../lib/questions';
+import { getCategories, getQuestions, getQuestionsByIds, savePracticeRecord, updateQuestion } from '../lib/questions';
 import { resolveQuestionAI } from '../lib/ai';
 import { useAuthStore } from '../store/authStore';
 import { usePracticeStore } from '../store/practiceStore';
@@ -10,7 +10,8 @@ import CategoryFilter from '../components/CategoryFilter';
 import Loading from '../components/Loading';
 import EmptyState from '../components/EmptyState';
 
-const SESSION_KEY = 'practice_filters';
+const FILTERS_KEY = 'practice_filters';
+const SESSION_KEY = 'practice_session';
 
 function loadFilters(): {
   keyword: string;
@@ -20,7 +21,7 @@ function loadFilters(): {
   count: number;
 } {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
+    const raw = sessionStorage.getItem(FILTERS_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
   return { keyword: '', categoryId: '', difficulty: '', type: '', count: 10 };
@@ -28,7 +29,35 @@ function loadFilters(): {
 
 function saveFilters(f: ReturnType<typeof loadFilters>) {
   try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(f));
+    sessionStorage.setItem(FILTERS_KEY, JSON.stringify(f));
+  } catch {}
+}
+
+interface SessionData {
+  queueIds: string[];
+  currentIndex: number;
+  userAnswers: Record<string, string>;
+  aiMap: Record<string, string>;
+  showAnswer: boolean;
+}
+
+function loadSession(): SessionData | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function saveSession(data: SessionData) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+function clearSession() {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
   } catch {}
 }
 
@@ -38,6 +67,7 @@ export default function Practice() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState(false); // 是否正在恢复答题状态
 
   // 从 sessionStorage 恢复筛选状态；URL 参数优先级最高
   const [keyword, setKeyword] = useState(() => loadFilters().keyword);
@@ -49,14 +79,36 @@ export default function Practice() {
   const [started, setStarted] = useState(false);
   const [aiMap, setAiMap] = useState<Record<string, string>>({});
   const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
-  const [currentAnswer, setCurrentAnswer] = useState('');
+  const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [errorMsg, setErrorMsg] = useState('');
 
   const user = useAuthStore((s) => s.user);
   const {
     queue, currentIndex, showAnswer,
-    start, next, prev, reveal, reset,
+    start, next, prev, setIndex, reveal, reset,
   } = usePracticeStore();
+
+  // 恢复答题状态（页面刷新后自动恢复）
+  useEffect(() => {
+    const session = loadSession();
+    if (!session) return;
+    setRestoring(true);
+    getQuestionsByIds(session.queueIds)
+      .then((qs) => {
+        if (!qs.length) return;
+        start(qs);
+        setAiMap(session.aiMap);
+        setUserAnswers(session.userAnswers);
+        setStarted(true);
+        const { currentIndex: idx, showAnswer: sa } = session;
+        const targetIndex = Math.min(idx, qs.length - 1);
+        if (targetIndex > 0) setIndex(targetIndex);
+        if (sa) reveal();
+      })
+      .catch(console.warn)
+      .finally(() => setRestoring(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     getCategories().then(setCategories);
@@ -71,9 +123,23 @@ export default function Practice() {
     saveFilters({ keyword, categoryId, difficulty, type, count });
   }, [keyword, categoryId, difficulty, type, count]);
 
+  // 答题状态变化时自动保存
+  useEffect(() => {
+    if (!started || !queue.length) return;
+    saveSession({
+      queueIds: queue.map((q) => q.id),
+      currentIndex,
+      userAnswers,
+      aiMap,
+      showAnswer,
+    });
+  }, [started, queue, currentIndex, userAnswers, aiMap, showAnswer]);
+
   const startPractice = async () => {
     setErrorMsg('');
     setLoading(true);
+    setUserAnswers({});
+    setAiMap({});
     try {
       const qs = await getQuestions({
         categoryId: categoryId || undefined,
@@ -101,10 +167,12 @@ export default function Practice() {
   const current = queue[currentIndex];
 
   const handleSubmitAnswer = async (ans: string) => {
-    setCurrentAnswer(ans);
+    // 保存用户答案
+    if (current) {
+      setUserAnswers((prev) => ({ ...prev, [current.id]: ans }));
+    }
     reveal();
     if (user && current) {
-      // 标准化：多选题按字符排序去重比较；其他题目做 trim 比较
       const normalize = (a: string) => {
         const cleaned = a.trim().toLowerCase().replace(/\s+/g, '');
         if (current.type === 'multiple') {
@@ -127,8 +195,11 @@ export default function Practice() {
   };
 
   const handleNext = () => {
-    setCurrentAnswer('');
     next();
+  };
+
+  const handlePrev = () => {
+    prev();
   };
 
   const handleAskAI = async () => {
@@ -141,7 +212,7 @@ export default function Practice() {
     try {
       const { resolution } = await resolveQuestionAI({
         question: current,
-        userAnswer: currentAnswer,
+        userAnswer: userAnswers[current.id] || '',
       });
       setAiMap((m) => ({ ...m, [current.id]: resolution }));
 
@@ -223,7 +294,9 @@ export default function Practice() {
         <button
           onClick={() => {
             setStarted(false);
-            sessionStorage.removeItem(SESSION_KEY);
+            setUserAnswers({});
+            setAiMap({});
+            clearSession();
             reset();
           }}
           className="text-sm text-theme-muted hover:text-theme-secondary"
@@ -240,15 +313,20 @@ export default function Practice() {
       </div>
 
       {loading && <Loading />}
-      {!loading && current && (
+      {restoring && (
+        <div className="flex items-center justify-center py-16">
+          <span className="text-sm text-theme-muted animate-pulse">正在恢复答题进度...</span>
+        </div>
+      )}
+      {!loading && !restoring && current && (
         <>
           <QuestionCard
             question={current}
             mode="practice"
-            userAnswer={currentAnswer}
+            userAnswer={userAnswers[current.id] || ''}
             onAnswerChange={handleSubmitAnswer}
             showAnswer={showAnswer}
-            onReveal={() => handleSubmitAnswer(currentAnswer || '')}
+            onReveal={() => handleSubmitAnswer(userAnswers[current.id] || '')}
             aiResolution={aiMap[current.id]}
             aiLoading={aiLoadingId === current.id}
             onAskAI={handleAskAI}
