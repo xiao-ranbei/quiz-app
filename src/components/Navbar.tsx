@@ -6,6 +6,7 @@ import { useAuthStore } from '../store/authStore';
 const navItems = [
   { to: '/', label: '首页' },
   { to: '/questions', label: '题库' },
+  { to: '/memory', label: '背诵' },
   { to: '/practice', label: '练习' },
   { to: '/exam', label: '考试' },
   { to: '/wrong', label: '错题本' },

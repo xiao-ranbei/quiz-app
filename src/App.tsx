@@ -9,6 +9,10 @@ import WrongBook from './pages/WrongBook';
 import SubmitQuestion from './pages/SubmitQuestion';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
+import MemoryHome from './pages/memory/MemoryHome';
+import DeckDetail from './pages/memory/DeckDetail';
+import MemoryStudy from './pages/memory/MemoryStudy';
+import AddCard from './pages/memory/AddCard';
 import { initAuth } from './store/authStore';
 
 export default function App() {
@@ -30,6 +34,11 @@ export default function App() {
             <Route path="/submit" element={<SubmitQuestion />} />
             <Route path="/me" element={<Profile />} />
             <Route path="/login" element={<Login />} />
+            {/* 背诵模块路由 */}
+            <Route path="/memory" element={<MemoryHome />} />
+            <Route path="/memory/deck/:id" element={<DeckDetail />} />
+            <Route path="/memory/study/:deckId" element={<MemoryStudy />} />
+            <Route path="/memory/add" element={<AddCard />} />
             <Route path="*" element={<Home />} />
           </Routes>
         </main>

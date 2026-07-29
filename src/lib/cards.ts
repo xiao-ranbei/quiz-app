@@ -1,0 +1,611 @@
+import { supabase } from './supabase';
+import { sm2 } from './sm2';
+import type {
+  Deck, Card, CardUserState, CardReview,
+  MemoryStats, DeckStats, ReviewHistoryItem,
+  DeckFilter, CardInput, DeckInput, ReviewMode, SM2State,
+} from '../types';
+
+// 复用 questions.ts 中的管理员判定（邮箱白名单 + user_profiles.role_key 双重判定）
+export { isCurrentUserAdmin } from './questions';
+
+/**
+ * 获取当前登录用户 ID
+ * @returns 用户 ID；未登录时返回 null
+ */
+async function getCurrentUserId(): Promise<string | null> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) return null;
+  return data.user.id;
+}
+
+// ============================================================
+// SubTask 4.2: Deck CRUD
+// ============================================================
+
+/**
+ * 获取牌组列表
+ * - 提供 filter.creator_id 时：返回公开牌组 + 该用户自己的私有牌组
+ * - 否则只返回公开牌组
+ * - 支持按 visibility / lang / card_type 过滤
+ * - 按 created_at 倒序排列
+ */
+export async function getDecks(filter?: DeckFilter): Promise<Deck[]> {
+  let query = supabase.from('decks').select('*');
+
+  if (filter?.creator_id) {
+    // 公开 OR 本人创建
+    query = query.or(`visibility.eq.public,creator_id.eq.${filter.creator_id}`);
+  } else {
+    query = query.eq('visibility', 'public');
+  }
+
+  if (filter?.visibility) query = query.eq('visibility', filter.visibility);
+  if (filter?.lang) query = query.eq('lang', filter.lang);
+  if (filter?.card_type) query = query.eq('card_type', filter.card_type);
+
+  query = query.order('created_at', { ascending: false });
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as Deck[];
+}
+
+/**
+ * 获取单个牌组详情
+ * @param id 牌组 ID
+ * @returns 牌组对象；不存在时返回 null
+ */
+export async function getDeck(id: string): Promise<Deck | null> {
+  const { data, error } = await supabase
+    .from('decks')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Deck | null;
+}
+
+/**
+ * 创建牌组
+ * creator_id 从当前登录用户获取；未登录抛错
+ */
+export async function createDeck(input: DeckInput): Promise<Deck> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('未登录，无法创建牌组');
+
+  const { data, error } = await supabase
+    .from('decks')
+    .insert({
+      name: input.name,
+      description: input.description ?? null,
+      lang: input.lang,
+      card_type: input.card_type,
+      visibility: input.visibility ?? 'private',
+      creator_id: userId,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Deck;
+}
+
+/**
+ * 更新牌组字段（updated_at 由数据库触发器或代码层维护）
+ */
+export async function updateDeck(id: string, input: Partial<DeckInput>): Promise<Deck> {
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.name !== undefined) updates.name = input.name;
+  if (input.description !== undefined) updates.description = input.description;
+  if (input.lang !== undefined) updates.lang = input.lang;
+  if (input.card_type !== undefined) updates.card_type = input.card_type;
+  if (input.visibility !== undefined) updates.visibility = input.visibility;
+
+  const { data, error } = await supabase
+    .from('decks')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Deck;
+}
+
+/**
+ * 删除牌组（卡片会通过 on delete cascade 级联删除）
+ */
+export async function deleteDeck(id: string): Promise<void> {
+  const { error } = await supabase.from('decks').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ============================================================
+// SubTask 4.3: Card CRUD
+// ============================================================
+
+/**
+ * 分页查询某牌组下的卡片
+ * - search 模糊匹配 front 或 back（ilike）
+ * - total 通过 count head 单独查询
+ * @returns { data: Card[]; total: number }
+ */
+export async function getCards(
+  deckId: string,
+  pagination?: { page: number; pageSize: number; search?: string },
+): Promise<{ data: Card[]; total: number }> {
+  // 计数查询
+  let countQuery = supabase
+    .from('cards')
+    .select('id', { count: 'exact', head: true })
+    .eq('deck_id', deckId);
+  if (pagination?.search) {
+    const kw = `%${pagination.search}%`;
+    countQuery = countQuery.or(`front.ilike.${kw},back.ilike.${kw}`);
+  }
+  const { count, error: countErr } = await countQuery;
+  if (countErr) throw countErr;
+  const total = count ?? 0;
+
+  // 数据查询
+  let dataQuery = supabase.from('cards').select('*').eq('deck_id', deckId);
+  if (pagination?.search) {
+    const kw = `%${pagination.search}%`;
+    dataQuery = dataQuery.or(`front.ilike.${kw},back.ilike.${kw}`);
+  }
+  dataQuery = dataQuery.order('created_at', { ascending: false });
+
+  if (pagination) {
+    const { page, pageSize } = pagination;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    dataQuery = dataQuery.range(from, to);
+  }
+
+  const { data, error } = await dataQuery;
+  if (error) throw error;
+  return { data: (data ?? []) as Card[], total };
+}
+
+/**
+ * 获取单个卡片详情
+ */
+export async function getCard(id: string): Promise<Card | null> {
+  const { data, error } = await supabase
+    .from('cards')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Card | null;
+}
+
+/**
+ * 插入卡片
+ * creator_id 从当前登录用户获取；未登录抛错
+ */
+export async function insertCard(input: CardInput): Promise<Card> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('未登录，无法创建卡片');
+
+  const { data, error } = await supabase
+    .from('cards')
+    .insert({
+      deck_id: input.deck_id,
+      front: input.front,
+      back: input.back,
+      metadata: input.metadata ?? {},
+      tags: input.tags ?? [],
+      creator_id: userId,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Card;
+}
+
+/**
+ * 批量插入卡片（所有 item 共享当前用户 creator_id）
+ */
+export async function insertCardsBulk(items: CardInput[]): Promise<Card[]> {
+  if (items.length === 0) return [];
+
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('未登录，无法创建卡片');
+
+  const rows = items.map((item) => ({
+    deck_id: item.deck_id,
+    front: item.front,
+    back: item.back,
+    metadata: item.metadata ?? {},
+    tags: item.tags ?? [],
+    creator_id: userId,
+  }));
+
+  const { data, error } = await supabase.from('cards').insert(rows).select();
+  if (error) throw error;
+  return (data ?? []) as Card[];
+}
+
+/**
+ * 更新卡片字段
+ */
+export async function updateCard(id: string, input: Partial<CardInput>): Promise<Card> {
+  const updates: Record<string, unknown> = {};
+  if (input.deck_id !== undefined) updates.deck_id = input.deck_id;
+  if (input.front !== undefined) updates.front = input.front;
+  if (input.back !== undefined) updates.back = input.back;
+  if (input.metadata !== undefined) updates.metadata = input.metadata;
+  if (input.tags !== undefined) updates.tags = input.tags;
+
+  const { data, error } = await supabase
+    .from('cards')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Card;
+}
+
+/**
+ * 删除卡片
+ */
+export async function deleteCard(id: string): Promise<void> {
+  const { error } = await supabase.from('cards').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ============================================================
+// SubTask 4.4: 今日复习队列
+// ============================================================
+
+/**
+ * 获取今日复习队列：到期卡 + 新卡（前 newCardLimit 张）
+ *
+ * 简化实现（避免复杂 SQL）：
+ * 1. 查该 deck 所有 cards 的 id 列表
+ * 2. 查该用户对这些 card 的 card_user_states 中 due <= now 的记录 → 到期卡
+ * 3. 查该用户对这些 card 的所有 card_user_states → 已学过的 card_id 集合
+ * 4. 新卡 = 该 deck 所有 cards - 已学过的 card_id，取前 newCardLimit 张
+ * 5. 用 id 列表去 cards 表查完整数据并合并返回
+ *
+ * @param deckId 牌组 ID
+ * @param newCardLimit 新卡配额（默认 20）
+ */
+export async function getTodayReviewQueue(deckId: string, newCardLimit = 20): Promise<Card[]> {
+  const userId = await getCurrentUserId();
+  // 未登录用户直接返回空（RLS 也会拦截 card_user_states 查询）
+  if (!userId) return [];
+
+  // 1. 拿到该 deck 所有 card_id
+  const { data: deckCards, error: cardsErr } = await supabase
+    .from('cards')
+    .select('id')
+    .eq('deck_id', deckId);
+  if (cardsErr) throw cardsErr;
+  const allCardIds = (deckCards ?? []).map((c) => c.id);
+  if (allCardIds.length === 0) return [];
+
+  // 2. 到期卡：user_id = me AND card_id IN (allCardIds) AND due <= now
+  const { data: dueStates, error: dueErr } = await supabase
+    .from('card_user_states')
+    .select('card_id')
+    .eq('user_id', userId)
+    .in('card_id', allCardIds)
+    .lte('due', new Date().toISOString())
+    .order('due', { ascending: true });
+  if (dueErr) throw dueErr;
+  const dueCardIds = (dueStates ?? []).map((s) => s.card_id);
+
+  // 3. 已学过的 card_id 集合（不带 due 过滤）
+  const { data: learnedStates, error: learnedErr } = await supabase
+    .from('card_user_states')
+    .select('card_id')
+    .eq('user_id', userId)
+    .in('card_id', allCardIds);
+  if (learnedErr) throw learnedErr;
+  const learnedSet = new Set((learnedStates ?? []).map((s) => s.card_id));
+
+  // 4. 新卡：未学过的卡片，取前 newCardLimit 张
+  const newCardNeeded = Math.max(0, newCardLimit - dueCardIds.length);
+  const newCardIds: string[] = [];
+  for (const id of allCardIds) {
+    if (newCardIds.length >= newCardNeeded) break;
+    if (!learnedSet.has(id)) newCardIds.push(id);
+  }
+
+  // 5. 合并 id 列表，去 cards 表查完整数据
+  const mergedIds = Array.from(new Set([...dueCardIds, ...newCardIds]));
+  if (mergedIds.length === 0) return [];
+
+  const { data: fullCards, error: fullErr } = await supabase
+    .from('cards')
+    .select('*')
+    .in('id', mergedIds);
+  if (fullErr) throw fullErr;
+
+  // 按到期卡 → 新卡的顺序排列
+  const cardMap = new Map((fullCards ?? []).map((c) => [(c as Card).id, c as Card]));
+  const result: Card[] = [];
+  for (const id of dueCardIds) {
+    const c = cardMap.get(id);
+    if (c) result.push(c);
+  }
+  for (const id of newCardIds) {
+    const c = cardMap.get(id);
+    if (c) result.push(c);
+  }
+  return result;
+}
+
+// ============================================================
+// SubTask 4.5: 提交复习
+// ============================================================
+
+/**
+ * 提交一次复习记录并更新调度状态
+ *
+ * 1. 获取当前用户
+ * 2. 查询现有 card_user_states（user_id = me AND card_id = cardId）
+ * 3. 用现有 state 或默认 state 调用 sm2 算法计算新调度
+ * 4. upsert card_user_states
+ * 5. insert card_reviews
+ * 6. 返回更新后的 state 和 review 记录
+ *
+ * @param cardId 卡片 ID
+ * @param mode 复习模式
+ * @param quality 回答质量 0-5
+ * @param userAnswer 用户作答内容（可选）
+ */
+export async function submitReview(
+  cardId: string,
+  mode: ReviewMode,
+  quality: number,
+  userAnswer?: string,
+): Promise<{ state: CardUserState; review: CardReview }> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('未登录，无法提交复习记录');
+
+  // 2. 查询现有 state
+  const { data: existing, error: queryErr } = await supabase
+    .from('card_user_states')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('card_id', cardId)
+    .maybeSingle();
+  if (queryErr) throw queryErr;
+
+  // 3. 构造 SM2State
+  const existingState = existing as CardUserState;
+  const prevState: SM2State = existing
+    ? {
+        ease: existingState.ease,
+        interval: existingState.interval_days,
+        repetitions: existingState.repetitions,
+        lastReviewed: existingState.last_reviewed
+          ? new Date(existingState.last_reviewed)
+          : null,
+      }
+    : { ease: 2.5, interval: 0, repetitions: 0, lastReviewed: null };
+
+  // 调用 SM-2 算法
+  const result = sm2(prevState, quality);
+  const nowIso = new Date().toISOString();
+
+  // 4. upsert card_user_states
+  const stateRow = {
+    user_id: userId,
+    card_id: cardId,
+    ease: result.ease,
+    interval_days: result.interval,
+    repetitions: result.repetitions,
+    due: result.due.toISOString(),
+    last_reviewed: nowIso,
+  };
+  const { data: stateData, error: stateErr } = await supabase
+    .from('card_user_states')
+    .upsert(stateRow, { onConflict: 'user_id,card_id' })
+    .select()
+    .single();
+  if (stateErr) throw stateErr;
+
+  // 5. insert card_reviews
+  const { data: reviewData, error: reviewErr } = await supabase
+    .from('card_reviews')
+    .insert({
+      user_id: userId,
+      card_id: cardId,
+      mode,
+      quality,
+      user_answer: userAnswer ?? null,
+      reviewed_at: nowIso,
+    })
+    .select()
+    .single();
+  if (reviewErr) throw reviewErr;
+
+  return {
+    state: stateData as CardUserState,
+    review: reviewData as CardReview,
+  };
+}
+
+// ============================================================
+// SubTask 4.6: 统计函数
+// ============================================================
+
+/**
+ * 获取牌组维度统计
+ * - total: 该 deck 的卡片总数
+ * - learned: 该 user 在该 deck 中有 card_user_states 记录的数量
+ * - mastered: state 中 repetitions >= 3 且 interval_days >= 21 的数量
+ * - dueToday: state 中 due <= now 的数量
+ * - newCards: total - learned
+ */
+export async function getDeckStats(deckId: string): Promise<DeckStats> {
+  // 卡片总数
+  const { count: total, error: totalErr } = await supabase
+    .from('cards')
+    .select('id', { count: 'exact', head: true })
+    .eq('deck_id', deckId);
+  if (totalErr) throw totalErr;
+
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      total: total ?? 0,
+      learned: 0,
+      mastered: 0,
+      dueToday: 0,
+      newCards: total ?? 0,
+    };
+  }
+
+  // 拿到该 deck 所有 card_id
+  const { data: deckCards, error: cardsErr } = await supabase
+    .from('cards')
+    .select('id')
+    .eq('deck_id', deckId);
+  if (cardsErr) throw cardsErr;
+  const cardIds = (deckCards ?? []).map((c) => c.id);
+  if (cardIds.length === 0) {
+    return { total: 0, learned: 0, mastered: 0, dueToday: 0, newCards: 0 };
+  }
+
+  // 拉取该用户在这些 card 上的所有 state
+  const { data: states, error: statesErr } = await supabase
+    .from('card_user_states')
+    .select('*')
+    .eq('user_id', userId)
+    .in('card_id', cardIds);
+  if (statesErr) throw statesErr;
+
+  const stateList = (states ?? []) as CardUserState[];
+  const learned = stateList.length;
+  const nowIso = new Date().toISOString();
+  const mastered = stateList.filter(
+    (s) => s.repetitions >= 3 && s.interval_days >= 21,
+  ).length;
+  const dueToday = stateList.filter((s) => s.due <= nowIso).length;
+
+  return {
+    total: total ?? 0,
+    learned,
+    mastered,
+    dueToday,
+    newCards: (total ?? 0) - learned,
+  };
+}
+
+/**
+ * 获取用户在背诵模块的整体统计
+ * - dueToday: 该 user 所有 due <= now 的 state 数量
+ * - newToday: 默认配额 20（简化处理）
+ * - mastered: 该 user 所有 state 中 repetitions >= 3 且 interval_days >= 21 的数量
+ * - totalCards: 所有 public deck + 自己 private deck 的卡片总数
+ */
+export async function getUserMemoryStats(): Promise<MemoryStats> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return { dueToday: 0, newToday: 20, mastered: 0, totalCards: 0 };
+  }
+
+  // 该用户所有 state
+  const { data: states, error: statesErr } = await supabase
+    .from('card_user_states')
+    .select('due, repetitions, interval_days')
+    .eq('user_id', userId);
+  if (statesErr) throw statesErr;
+
+  const stateList = (states ?? []) as Array<{
+    due: string;
+    repetitions: number;
+    interval_days: number;
+  }>;
+  const nowIso = new Date().toISOString();
+  const dueToday = stateList.filter((s) => s.due <= nowIso).length;
+  const mastered = stateList.filter(
+    (s) => s.repetitions >= 3 && s.interval_days >= 21,
+  ).length;
+
+  // 拿到该用户可见的所有 deck id（公开 + 自己的私有）
+  const { data: visibleDecks, error: decksErr } = await supabase
+    .from('decks')
+    .select('id')
+    .or(`visibility.eq.public,creator_id.eq.${userId}`);
+  if (decksErr) throw decksErr;
+  const deckIds = (visibleDecks ?? []).map((d) => d.id);
+
+  let totalCards = 0;
+  if (deckIds.length > 0) {
+    const { count, error: cardsErr } = await supabase
+      .from('cards')
+      .select('id', { count: 'exact', head: true })
+      .in('deck_id', deckIds);
+    if (cardsErr) throw cardsErr;
+    totalCards = count ?? 0;
+  }
+
+  return {
+    dueToday,
+    newToday: 20,
+    mastered,
+    totalCards,
+  };
+}
+
+/**
+ * 获取最近 N 天的复习历史（按天聚合）
+ *
+ * 简化实现：查询最近 N 天的 card_reviews，前端按 reviewed_at 的日期分组计数
+ * 缺失日期补 0
+ *
+ * @param days 天数，默认 7
+ * @returns [{ date: 'YYYY-MM-DD', count: N }, ...]
+ */
+export async function getReviewHistory(days = 7): Promise<ReviewHistoryItem[]> {
+  const userId = await getCurrentUserId();
+  if (!userId) return [];
+
+  // 计算起始日期（含今天，共 days 天）
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(start.getDate() - (days - 1));
+  start.setHours(0, 0, 0, 0);
+
+  const { data, error } = await supabase
+    .from('card_reviews')
+    .select('reviewed_at')
+    .eq('user_id', userId)
+    .gte('reviewed_at', start.toISOString())
+    .order('reviewed_at', { ascending: true });
+  if (error) throw error;
+
+  // 初始化每天 0 条
+  const dateMap = new Map<string, number>();
+  for (let i = 0; i < days; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    dateMap.set(formatDate(d), 0);
+  }
+
+  // 按 reviewed_at 的日期分组计数
+  for (const row of data ?? []) {
+    const dateStr = formatDate(new Date(row.reviewed_at));
+    if (dateMap.has(dateStr)) {
+      dateMap.set(dateStr, (dateMap.get(dateStr) ?? 0) + 1);
+    }
+  }
+
+  return Array.from(dateMap.entries()).map(([date, count]) => ({ date, count }));
+}
+
+/**
+ * 将 Date 格式化为 YYYY-MM-DD（本地时区）
+ */
+function formatDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
