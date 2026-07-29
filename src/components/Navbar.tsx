@@ -47,7 +47,7 @@ export default function Navbar() {
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 text-brand-600 dark:text-brand-300 hover:opacity-80">
           <BookOpen className="w-6 h-6" />
-          <span className="font-semibold text-lg text-theme-primary">刷题平台</span>
+          <span className="font-semibold text-lg text-theme-primary">Quiz</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">

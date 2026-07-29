@@ -10,7 +10,7 @@ Set-Location $ProjectRoot
 
 Write-Host ""
 Write-Host "=======================================" -ForegroundColor Cyan
-Write-Host "  刷题平台 一键部署" -ForegroundColor Cyan
+Write-Host "  Quiz 一键部署" -ForegroundColor Cyan
 Write-Host "=======================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "项目目录: $ProjectRoot"
