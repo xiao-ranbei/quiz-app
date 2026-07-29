@@ -19,6 +19,7 @@ import {
   getUserMemoryStats,
 } from '../../lib/cards';
 import { useAuthStore } from '../../store/authStore';
+import { useRequireAuth } from '../../store/useRequireAuth';
 import Loading from '../../components/Loading';
 import type {
   CardType,
@@ -54,6 +55,7 @@ const EMPTY_FORM: DeckInput = {
 export default function MemoryHome() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const requireAuth = useRequireAuth();
 
   const [stats, setStats] = useState<MemoryStats | null>(null);
   const [myDecks, setMyDecks] = useState<DeckWithProgress[]>([]);
@@ -220,10 +222,10 @@ export default function MemoryHome() {
           </button>
         ) : (
           <button
-            disabled
-            className="px-4 py-2 text-sm bg-theme-card border border-theme text-theme-muted rounded-md cursor-not-allowed shrink-0"
+            onClick={() => requireAuth('请登录后创建牌组')}
+            className="px-4 py-2 text-sm bg-theme-card border border-theme text-theme-secondary hover:bg-theme-hover rounded-md flex items-center gap-1.5 shrink-0"
           >
-            登录后创建
+            <Plus className="w-4 h-4" /> 新建牌组
           </button>
         )}
       </section>

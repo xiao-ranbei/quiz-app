@@ -95,3 +95,18 @@
     width: var(--progress, 0%);
   }
 }
+
+/* Toast 进入动画 */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.animate-toast-in {
+  animation: toast-in 200ms ease-out;
+}

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Question, WrongBookItem } from '../types';
 import { DIFFICULTY_LABEL } from '../types';
 import { getWrongBook, toggleWrongBookMastered } from '../lib/questions';
 import { useAuthStore } from '../store/authStore';
+import { toast } from '../store/toastStore';
 import Loading from '../components/Loading';
 import EmptyState from '../components/EmptyState';
 
@@ -12,6 +13,14 @@ export default function WrongBook() {
   const [loading, setLoading] = useState(false);
   const [onlyNotMastered, setOnlyNotMastered] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const toastedRef = useRef(false);
+  useEffect(() => {
+    if (!authLoading && !user && !toastedRef.current) {
+      toastedRef.current = true;
+      toast.warning('请先登录后查看错题本');
+    }
+  }, [authLoading, user]);
 
   useEffect(() => {
     if (authLoading || !user) return;

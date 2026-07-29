@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ClipboardCheck, ListChecks, Plus, Sparkles, Trash2, Trophy, X } from 'lucide-react';
 import {
   getCategories,
@@ -10,11 +10,14 @@ import {
   isCurrentUserAdmin,
 } from '../lib/questions';
 import { useAuthStore } from '../store/authStore';
+import { useRequireAuth } from '../store/useRequireAuth';
 import Loading from '../components/Loading';
 import type { Category } from '../types';
 
 export default function Home() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const requireAuth = useRequireAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryCounts, setCategoryCounts] = useState<Map<string, number>>(new Map());
   const [total, setTotal] = useState<number>(0);
@@ -106,14 +109,16 @@ export default function Home() {
               <Trophy className="w-4 h-4" /> 模拟考试
             </span>
           </Link>
-          <Link
-            to="/submit"
+          <button
+            onClick={() => {
+              if (requireAuth('请登录后使用 AI 出题功能')) navigate('/submit');
+            }}
             className="px-5 py-2.5 bg-theme-card hover:bg-theme-hover text-theme-primary rounded-lg text-sm font-medium border border-theme"
           >
             <span className="inline-flex items-center gap-2">
               <Sparkles className="w-4 h-4" /> AI 出题
             </span>
-          </Link>
+          </button>
         </div>
       </section>
 

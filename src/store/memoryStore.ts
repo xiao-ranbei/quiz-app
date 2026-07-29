@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Card, ReviewMode } from '../types';
 import { getTodayReviewQueue, submitReview as submitReviewApi } from '../lib/cards';
+import { toast } from './toastStore';
 
 const SESSION_KEY = 'memory-study-session';
 
@@ -191,7 +192,14 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
       // 自动进入下一张（next 内部会同步 sessionStorage）
       get().next();
     } catch (e) {
-      set({ error: '提交复习记录失败' });
+      // 未登录或网络错误：提示用户但不卡住进度（游客可继续学习公共牌组）
+      const msg = e instanceof Error && e.message.includes('未登录')
+        ? '请登录后记录学习进度'
+        : '提交复习记录失败';
+      set({ error: msg });
+      toast.warning(msg);
+      // 仍推进到下一张，避免游客卡住
+      get().next();
     }
   },
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import type { Category, Difficulty, QuestionType } from "../types";
 import { DIFFICULTY_LABEL, TYPE_LABEL } from "../types";
@@ -11,6 +11,7 @@ import {
   isCurrentUserAdmin,
 } from "../lib/questions";
 import { useAuthStore } from "../store/authStore";
+import { toast } from "../store/toastStore";
 import { generateQuestions } from "../lib/ai";
 
 type OptionsInput = { A: string; B: string; C: string; D: string; E?: string; F?: string };
@@ -58,7 +59,7 @@ function normalizeOptions(
 }
 
 export default function SubmitQuestion() {
-  const { user } = useAuthStore();
+  const { user, loading: authLoading } = useAuthStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeTab, setActiveTab] = useState<"single" | "batch" | "ai">("single");
   const [form, setForm] = useState(defaults);
@@ -74,6 +75,14 @@ export default function SubmitQuestion() {
   const [newCatName, setNewCatName] = useState("");
   const [deletingCat, setDeletingCat] = useState<string | null>(null);
   const [catMsg, setCatMsg] = useState<string | null>(null);
+
+  const toastedRef = useRef(false);
+  useEffect(() => {
+    if (!authLoading && !user && !toastedRef.current) {
+      toastedRef.current = true;
+      toast.warning('请先登录后提交题目');
+    }
+  }, [authLoading, user]);
 
   useEffect(() => {
     getCategories().then(setCategories);

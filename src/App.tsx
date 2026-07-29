@@ -14,6 +14,7 @@ import DeckDetail from './pages/memory/DeckDetail';
 import MemoryStudy from './pages/memory/MemoryStudy';
 import AddCard from './pages/memory/AddCard';
 import { initAuth } from './store/authStore';
+import ToastContainer from './components/Toast';
 
 export default function App() {
   useEffect(() => {
@@ -45,6 +46,7 @@ export default function App() {
         <footer className="py-10 text-center text-xs text-theme-muted">
           © {new Date().getFullYear()} Quiz App
         </footer>
+        <ToastContainer />
       </div>
     </HashRouter>
   );

@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AIConfig, ExamSession } from '../types';
 import { getAIConfig, saveAIConfig, testAIConnection } from '../lib/ai';
 import { getExamSessions, getUserStats } from '../lib/questions';
 import { useAuthStore } from '../store/authStore';
+import { toast } from '../store/toastStore';
 import Loading from '../components/Loading';
 
 export default function Profile() {
-  const { user, signOut } = useAuthStore();
+  const { user, signOut, loading: authLoading } = useAuthStore();
   const [stats, setStats] = useState<{
     totalAnswered: number;
     correct: number;
@@ -25,6 +26,14 @@ export default function Profile() {
     error?: string;
   } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+
+  const toastedRef = useRef(false);
+  useEffect(() => {
+    if (!authLoading && !user && !toastedRef.current) {
+      toastedRef.current = true;
+      toast.warning('请先登录后查看个人中心');
+    }
+  }, [authLoading, user]);
 
   useEffect(() => {
     if (!user) return;

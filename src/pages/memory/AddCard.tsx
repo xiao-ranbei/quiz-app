@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, X, Sparkles, FileUp } from "lucide-react";
 import type { Deck, Lang, CardType, CardInput } from "../../types";
 import { LANG_LABEL, CARD_TYPE_LABEL } from "../../types";
 import { insertCard, insertCardsBulk, getDecks, createDeck } from "../../lib/cards";
 import { supabase } from "../../lib/supabase";
 import { useAuthStore } from "../../store/authStore";
+import { toast } from "../../store/toastStore";
 
 // ============================================================
 // 类型与常量
@@ -171,7 +172,7 @@ function parseCsv(text: string): Record<string, unknown>[] {
 // ============================================================
 
 export default function AddCard() {
-  const { user } = useAuthStore();
+  const { user, loading: authLoading } = useAuthStore();
 
   // 通用状态
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -198,6 +199,14 @@ export default function AddCard() {
   const [aiCardType, setAiCardType] = useState<CardType>("word");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiCards, setAiCards] = useState<AiCardItem[] | null>(null);
+
+  const toastedRef = useRef(false);
+  useEffect(() => {
+    if (!authLoading && !user && !toastedRef.current) {
+      toastedRef.current = true;
+      toast.warning('请先登录后添加卡片');
+    }
+  }, [authLoading, user]);
 
   // 加载牌组列表
   useEffect(() => {
