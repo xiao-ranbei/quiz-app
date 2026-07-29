@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AIConfig, ExamSession } from '../types';
 import { getAIConfig, saveAIConfig, testAIConnection } from '../lib/ai';
-import { getExamSessions, getUserStats } from '../lib/questions';
+import { fetchProfileData, getExamSessions, getUserStats } from '../lib/questions';
 import { useAuthStore } from '../store/authStore';
 import { toast } from '../store/toastStore';
 import Loading from '../components/Loading';
@@ -37,13 +37,11 @@ export default function Profile() {
 
   useEffect(() => {
     if (!user) return;
-    Promise.all([getUserStats(user.id), getExamSessions(user.id), getAIConfig(user.id)]).then(
-      ([stats, sessions, ai]) => {
-        setStats(stats);
-        setSessions(sessions);
-        if (ai) setAiCfg(ai);
-      },
-    );
+    fetchProfileData().then(({ stats, examSessions, aiConfig }) => {
+      setStats(stats);
+      setSessions(examSessions);
+      if (aiConfig) setAiCfg(aiConfig);
+    });
   }, [user]);
 
   if (!user) {

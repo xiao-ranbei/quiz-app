@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ClipboardCheck, ListChecks, Plus, Sparkles, Trash2, Trophy, X } from 'lucide-react';
 import {
+  fetchHomeData,
   getCategories,
   getQuestionCount,
   getCategoryQuestionCounts,
@@ -31,15 +32,14 @@ export default function Home() {
   useEffect(() => {
     (async () => {
       try {
-        const [cats, cnt, counts, admin] = await Promise.all([
+        const [cats, homeData, admin] = await Promise.all([
           getCategories(),
-          getQuestionCount(),
-          getCategoryQuestionCounts(),
+          fetchHomeData(),
           isCurrentUserAdmin(),
         ]);
         setCategories(cats);
-        setTotal(cnt);
-        setCategoryCounts(counts);
+        setTotal(homeData.totalQuestions);
+        setCategoryCounts(homeData.categoryCounts);
         setIsAdmin(admin);
       } finally {
         setLoading(false);

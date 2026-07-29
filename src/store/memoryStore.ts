@@ -31,6 +31,7 @@ interface MemoryStudyState {
 
 interface MemoryStudyStore extends MemoryStudyState {
   start: (deckId: string, mode: ReviewMode) => Promise<void>;
+  changeMode: (newMode: ReviewMode) => void;
   next: () => void;
   prev: () => void;
   setIndex: (i: number) => void;
@@ -125,6 +126,14 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
     } catch (e) {
       set({ isLoading: false, error: '加载复习队列失败' });
     }
+  },
+
+  /**
+   * 切换学习模式，不重新拉取队列
+   * 仅更新 mode 和相关 UI 状态
+   */
+  changeMode: (newMode: ReviewMode) => {
+    set({ mode: newMode });
   },
 
   // 下一张：已是最后一张则标记完成

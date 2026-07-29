@@ -101,6 +101,7 @@ export default function MemoryStudy() {
     startTime,
     isFinished,
     start,
+    changeMode,
     flip,
     submitReview,
   } = useMemoryStore();
@@ -199,17 +200,27 @@ export default function MemoryStudy() {
   const handleModeChange = (newMode: ReviewMode) => {
     if (!deckId) return;
     setNotice('');
+    // 降级检查：如果新模式不支持当前队列，切换到兼容模式
     if (newMode === 'choice' && queue.length < 4) {
       setNotice('牌组卡片不足 4 张，无法使用选择题模式，已切换为闪卡');
-      start(deckId, 'flashcard');
+      // queue 为空时需要 start 重新拉取；否则仅切换模式
+      if (queue.length === 0) start(deckId, 'flashcard');
+      else changeMode('flashcard');
       return;
     }
     if (newMode === 'dictation' && !supportsSpeech) {
       setNotice('浏览器不支持语音合成，已切换为拼写模式');
-      start(deckId, 'typing');
+      if (queue.length === 0) start(deckId, 'typing');
+      else changeMode('typing');
       return;
     }
-    start(deckId, newMode);
+    // queue 为空时需要 start 重新拉取
+    if (queue.length === 0) {
+      start(deckId, newMode);
+      return;
+    }
+    // 正常切换：仅更新模式，不重新拉取队列
+    changeMode(newMode);
   };
 
   // ============ SubTask 9.4: 闪卡评分 ============

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Category, Difficulty, Question, QuestionType } from '../types';
-import { getCategories, getQuestions, saveExamSession } from '../lib/questions';
+import { getCategories, getQuestions, submitExamSessionRpc } from '../lib/questions';
 import { useAuthStore } from '../store/authStore';
 import { useExamStore } from '../store/examStore';
 import QuestionCard from '../components/QuestionCard';
@@ -87,7 +87,7 @@ export default function Exam() {
     });
     if (user) {
       try {
-        await saveExamSession({
+        await submitExamSessionRpc({
           userId: user.id,
           title: '模拟考试',
           total: exam.questions.length,

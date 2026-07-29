@@ -246,6 +246,7 @@ export default function Questions() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState('');
+  const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty | ''>('');
   const [type, setType] = useState<QuestionType | ''>('');
@@ -262,6 +263,12 @@ export default function Questions() {
     isCurrentUserAdmin().then(setIsAdmin);
   }, []);
 
+  // 关键字搜索 300ms debounce
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedKeyword(keyword), 300);
+    return () => clearTimeout(t);
+  }, [keyword]);
+
   useEffect(() => {
     setLoading(true);
     setLoadError(null);
@@ -269,7 +276,7 @@ export default function Questions() {
       categoryId: categoryId || undefined,
       difficulty: difficulty || undefined,
       type: type || undefined,
-      keyword: keyword || undefined,
+      keyword: debouncedKeyword || undefined,
     })
       .then((qs) => {
         setQuestions(qs);
@@ -279,7 +286,7 @@ export default function Questions() {
         setLoadError(e instanceof Error ? e.message : '加载失败');
       })
       .finally(() => setLoading(false));
-  }, [categoryId, difficulty, type, keyword]);
+  }, [categoryId, difficulty, type, debouncedKeyword]);
 
   const handleDelete = async (id: string) => {
     if (!isAdmin) return;
@@ -350,7 +357,7 @@ export default function Questions() {
         categoryId: categoryId || undefined,
         difficulty: difficulty || undefined,
         type: type || undefined,
-        keyword: keyword || undefined,
+        keyword: debouncedKeyword || undefined,
       }).then(setQuestions);
     } catch (e) {
       const msg = e instanceof Error ? e.message : '保存失败';

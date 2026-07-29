@@ -25,6 +25,7 @@ import {
   deleteCard,
   isCurrentUserAdmin,
 } from '../../lib/cards';
+import { fetchDeckDetailData } from '../../lib/questions';
 import { useAuthStore } from '../../store/authStore';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
@@ -167,6 +168,7 @@ export default function DeckDetail() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState('');
+  const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [mode, setMode] = useState<ReviewMode>(() => {
     // 优先 URL 中的 mode 参数，其次 localStorage，最后默认闪卡
     const fromUrl = searchParams.get('mode');
@@ -185,44 +187,40 @@ export default function DeckDetail() {
   const isOwner = deck?.creator_id === user?.id;
   const canManage = isOwner || isAdmin;
 
-  // 初始加载：牌组详情 + 统计 + 复习历史 + 管理员判定
+  // 关键字搜索 300ms debounce
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedKeyword(keyword), 300);
+    return () => clearTimeout(t);
+  }, [keyword]);
+
+  // 初始加载 + 卡片分页：用聚合 API 一次获取所有数据
   useEffect(() => {
     if (!id) return;
     setLoading(true);
+    setCardsLoading(true);
     setLoadError(null);
     Promise.all([
-      getDeck(id),
-      getDeckStats(id),
-      getReviewHistory(7),
+      fetchDeckDetailData(id, page, PAGE_SIZE, debouncedKeyword || undefined),
       isCurrentUserAdmin(),
     ])
-      .then(([d, s, h, admin]) => {
+      .then(([detail, admin]) => {
+        const { deck: d, stats: s, reviewHistory: h, cards: { data, total: t } } = detail;
         setDeck(d);
         setStats(s);
         setHistory(h);
+        setCards(data);
+        setTotal(t);
         setIsAdmin(admin);
         if (!d) setLoadError('牌组不存在或无权访问');
       })
       .catch((e) => {
         setLoadError(e instanceof Error ? e.message : '加载失败');
       })
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  // 卡片列表分页查询
-  useEffect(() => {
-    if (!id || !deck) return;
-    setCardsLoading(true);
-    getCards(id, { page, pageSize: PAGE_SIZE, search: keyword || undefined })
-      .then(({ data, total: t }) => {
-        setCards(data);
-        setTotal(t);
-      })
-      .catch((e) => {
-        setMsg({ ok: false, text: e instanceof Error ? e.message : '加载卡片失败' });
-      })
-      .finally(() => setCardsLoading(false));
-  }, [id, deck, page, keyword]);
+      .finally(() => {
+        setLoading(false);
+        setCardsLoading(false);
+      });
+  }, [id, page, debouncedKeyword]);
 
   // 关键字变化时重置到第一页
   const handleKeywordChange = (kw: string) => {

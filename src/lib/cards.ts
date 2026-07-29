@@ -6,15 +6,20 @@ import type {
   DeckFilter, CardInput, DeckInput, ReviewMode, SM2State,
   DeckWithStats,
 } from '../types';
+import { useAuthStore } from '../store/authStore';
 
 // 复用 questions.ts 中的管理员判定（邮箱白名单 + user_profiles.role_key 双重判定）
 export { isCurrentUserAdmin } from './questions';
 
 /**
  * 获取当前登录用户 ID
- * @returns 用户 ID；未登录时返回 null
+ * 优先从 authStore 读取，避免每次调用 auth.getUser() 网络往返
  */
 async function getCurrentUserId(): Promise<string | null> {
+  // 优先从 Zustand store 读取（同步，无网络请求）
+  const storeUser = useAuthStore.getState().user;
+  if (storeUser?.id) return storeUser.id;
+  // 降级：store 未初始化时回退到 auth.getUser()
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;
   return data.user.id;

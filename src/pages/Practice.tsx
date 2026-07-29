@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { Category, Difficulty, Question, QuestionType } from '../types';
-import { getCategories, getQuestions, getQuestionsByIds, savePracticeRecord, updateQuestion } from '../lib/questions';
+import { getCategories, getQuestions, getQuestionsByIds, savePracticeRecordRpc, updateQuestion } from '../lib/questions';
 import { resolveQuestionAI } from '../lib/ai';
 import { useAuthStore } from '../store/authStore';
 import { usePracticeStore } from '../store/practiceStore';
@@ -182,7 +182,7 @@ export default function Practice() {
       };
       const isCorrect = normalize(ans) === normalize(current.answer);
       try {
-        await savePracticeRecord({
+        await savePracticeRecordRpc({
           questionId: current.id,
           userAnswer: ans,
           isCorrect,

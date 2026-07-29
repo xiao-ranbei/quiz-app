@@ -350,3 +350,141 @@ export async function deleteQuestionsBulk(ids: string[]): Promise<void> {
   const { error } = await supabase.from('questions').delete().in('id', ids);
   if (error) throw error;
 }
+
+// ============================================================
+// 聚合 RPC 调用层（减少页面加载时的请求次数）
+// ============================================================
+
+/**
+ * 获取首页数据（题目总数 + 分类计数）
+ * 替代 getQuestionCount + getCategoryQuestionCounts
+ */
+export async function fetchHomeData(): Promise<{
+  totalQuestions: number;
+  categoryCounts: Map<string, number>;
+}> {
+  const { data, error } = await supabase.rpc('get_home_data');
+  if (error) throw error;
+  const raw = data as { totalQuestions: number; categoryCounts: Array<{ category_id: string; count: number }> };
+  const counts = new Map<string, number>();
+  (raw.categoryCounts ?? []).forEach((row) => {
+    counts.set(row.category_id, Number(row.count));
+  });
+  return { totalQuestions: raw.totalQuestions ?? 0, categoryCounts: counts };
+}
+
+/**
+ * 获取 DeckDetail 页面数据（牌组+统计+历史+分页卡片）
+ * 替代 getDeck + getDeckStats + getReviewHistory + getCards
+ */
+export async function fetchDeckDetailData(
+  deckId: string,
+  page: number = 1,
+  pageSize: number = 20,
+  search?: string,
+): Promise<{
+  deck: import('../types').Deck | null;
+  stats: import('../types').DeckStats;
+  reviewHistory: import('../types').ReviewHistoryItem[];
+  cards: { data: import('../types').Card[]; total: number };
+}> {
+  const { data, error } = await supabase.rpc('get_deck_detail', {
+    p_deck_id: deckId,
+    p_page: page,
+    p_page_size: pageSize,
+    p_search: search ?? null,
+  });
+  if (error) throw error;
+  const raw = data as any;
+  return {
+    deck: raw.deck ? {
+      id: raw.deck.id,
+      name: raw.deck.name,
+      description: raw.deck.description,
+      lang: raw.deck.lang,
+      card_type: raw.deck.card_type,
+      visibility: raw.deck.visibility,
+      creator_id: raw.deck.creator_id,
+      created_at: raw.deck.created_at,
+      updated_at: raw.deck.updated_at,
+    } : null,
+    stats: {
+      total: raw.stats?.total ?? 0,
+      learned: raw.stats?.learned ?? 0,
+      mastered: raw.stats?.mastered ?? 0,
+      dueToday: raw.stats?.dueToday ?? 0,
+      newCards: raw.stats?.newCards ?? 0,
+    },
+    reviewHistory: (raw.reviewHistory ?? []) as import('../types').ReviewHistoryItem[],
+    cards: {
+      data: (raw.cards?.data ?? []) as import('../types').Card[],
+      total: raw.cards?.total ?? 0,
+    },
+  };
+}
+
+/**
+ * 获取 Profile 页面数据（统计+考试+AI配置）
+ * 替代 getUserStats + getExamSessions + getAIConfig
+ */
+export async function fetchProfileData(): Promise<{
+  stats: { totalAnswered: number; correct: number; wrongCount: number; examCount: number } | null;
+  examSessions: import('../types').ExamSession[];
+  aiConfig: import('../types').AIConfig | null;
+}> {
+  const { data, error } = await supabase.rpc('get_profile_data');
+  if (error) throw error;
+  const raw = data as any;
+  return {
+    stats: raw.stats ?? null,
+    examSessions: (raw.examSessions ?? []) as import('../types').ExamSession[],
+    aiConfig: raw.aiConfig ?? null,
+  };
+}
+
+/**
+ * 提交考试（一次性完成交卷所有操作）
+ * 替代 saveExamSession 中的 2+N 次请求
+ */
+export async function submitExamSessionRpc(params: {
+  userId?: string;
+  title: string;
+  total: number;
+  timeLimitSec: number;
+  answers: Array<{ questionId: string; userAnswer: string; isCorrect: boolean }>;
+}): Promise<{ sessionId: string; score: number }> {
+  if (!params.userId) return { sessionId: '', score: 0 };
+  const { data, error } = await supabase.rpc('submit_exam_session', {
+    p_user_id: params.userId,
+    p_title: params.title,
+    p_total: params.total,
+    p_time_limit_sec: params.timeLimitSec,
+    p_answers: params.answers.map((a) => ({
+      question_id: a.questionId,
+      user_answer: a.userAnswer,
+      is_correct: a.isCorrect,
+    })),
+  });
+  if (error) throw error;
+  return data as { sessionId: string; score: number };
+}
+
+/**
+ * 保存练习记录（一次性完成作答记录）
+ * 替代 savePracticeRecord 中的 2 次请求
+ */
+export async function savePracticeRecordRpc(params: {
+  questionId: string;
+  userAnswer: string;
+  isCorrect: boolean;
+  userId?: string;
+}): Promise<void> {
+  if (!params.userId) return;
+  const { error } = await supabase.rpc('save_practice_record', {
+    p_user_id: params.userId,
+    p_question_id: params.questionId,
+    p_user_answer: params.userAnswer,
+    p_is_correct: params.isCorrect,
+  });
+  if (error) throw error;
+}
