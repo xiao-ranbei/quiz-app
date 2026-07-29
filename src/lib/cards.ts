@@ -604,6 +604,8 @@ export async function getDeckStatsBulk(
  * - newToday: 默认配额 20（简化处理）
  * - mastered: 该 user 所有 state 中 repetitions >= 3 且 interval_days >= 21 的数量
  * - totalCards: 所有 public deck + 自己 private deck 的卡片总数
+ *
+ * 优化：用 head:true count 查询替代拉全量 state 到前端聚合
  */
 export async function getUserMemoryStats(): Promise<MemoryStats> {
   const userId = await getCurrentUserId();
@@ -611,32 +613,39 @@ export async function getUserMemoryStats(): Promise<MemoryStats> {
     return { dueToday: 0, newToday: 20, mastered: 0, totalCards: 0 };
   }
 
-  // 该用户所有 state
-  const { data: states, error: statesErr } = await supabase
-    .from('card_user_states')
-    .select('due, repetitions, interval_days')
-    .eq('user_id', userId);
-  if (statesErr) throw statesErr;
-
-  const stateList = (states ?? []) as Array<{
-    due: string;
-    repetitions: number;
-    interval_days: number;
-  }>;
   const nowIso = new Date().toISOString();
-  const dueToday = stateList.filter((s) => s.due <= nowIso).length;
-  const mastered = stateList.filter(
-    (s) => s.repetitions >= 3 && s.interval_days >= 21,
-  ).length;
 
-  // 拿到该用户可见的所有 deck id（公开 + 自己的私有）
-  const { data: visibleDecks, error: decksErr } = await supabase
-    .from('decks')
-    .select('id')
-    .or(`visibility.eq.public,creator_id.eq.${userId}`);
-  if (decksErr) throw decksErr;
-  const deckIds = (visibleDecks ?? []).map((d) => d.id);
+  // 并行 3 次 count 查询（只返回数字，不拉全量行）
+  const [dueRes, masteredRes, decksRes] = await Promise.all([
+    // dueToday：到期卡数
+    supabase
+      .from('card_user_states')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .lte('due', nowIso),
+    // mastered：已掌握卡数
+    supabase
+      .from('card_user_states')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('repetitions', 3)
+      .gte('interval_days', 21),
+    // 可见 deck id 列表
+    supabase
+      .from('decks')
+      .select('id')
+      .or(`visibility.eq.public,creator_id.eq.${userId}`),
+  ]);
 
+  if (dueRes.error) throw dueRes.error;
+  if (masteredRes.error) throw masteredRes.error;
+  if (decksRes.error) throw decksRes.error;
+
+  const dueToday = dueRes.count ?? 0;
+  const mastered = masteredRes.count ?? 0;
+
+  // 统计可见 deck 的卡片总数
+  const deckIds = (decksRes.data ?? []).map((d: { id: string }) => d.id);
   let totalCards = 0;
   if (deckIds.length > 0) {
     const { count, error: cardsErr } = await supabase

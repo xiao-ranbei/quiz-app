@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlarmClock,
@@ -68,41 +68,60 @@ export default function MemoryHome() {
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState<string | null>(null);
 
-  // 批量获取每个牌组的 stats，计算掌握进度
-  const fetchProgress = async (decks: Deck[]): Promise<DeckWithProgress[]> => {
-    if (decks.length === 0) return [];
-    const statsMap = await getDeckStatsBulk(decks.map((d) => d.id)).catch(
-      () => new Map<string, DeckStats>(),
-    );
-    return decks.map((d) => {
-      const s = statsMap.get(d.id);
-      const mastered = s?.mastered ?? 0;
-      const total = s?.total ?? 0;
-      const percent = total > 0 ? Math.round((mastered / total) * 100) : 0;
-      return { ...d, mastered, total, percent };
-    });
-  };
+  // 加载页面数据：整体统计 + 牌组列表 + 进度（合并为最少请求数）
+  const loadingRef = useRef(false);
 
-  // 加载页面数据：整体统计 + 我的牌组 + 公共牌组
   const loadData = async () => {
+    // StrictMode 防护：同一时刻只允许一次加载
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     try {
-      const [memoryStats, myDeckList, publicDeckList] = await Promise.all([
-        getUserMemoryStats(),
-        user
-          ? getDecks({ creator_id: user.id })
-          : Promise.resolve([] as Deck[]),
-        getDecks({ visibility: 'public' }),
-      ]);
-      setStats(memoryStats);
+      // 1. 拉取整体统计（3 次查询，但仅一次调用）
+      const memoryStatsPromise = getUserMemoryStats().catch(() => null);
 
-      // getDecks({ creator_id }) 返回「公开 + 本人私有」，
-      // 这里再按 creator_id 过滤，确保「我的牌组」只展示本人创建的
-      const myOwn = myDeckList.filter((d) => d.creator_id === user?.id);
-      setMyDecks(await fetchProgress(myOwn));
-      setPublicDecks(await fetchProgress(publicDeckList));
+      // 2. 拉取牌组：登录用户用 creator_id（返回公开+私有），游客只拉公开
+      const decksPromise = user
+        ? getDecks({ creator_id: user.id })
+        : getDecks({ visibility: 'public' });
+
+      const [memoryStats, allDecks] = await Promise.all([
+        memoryStatsPromise,
+        decksPromise,
+      ]);
+
+      if (memoryStats) setStats(memoryStats);
+
+      // 3. 在内存中拆分牌组，一次批量查进度
+      let myOwn: Deck[] = [];
+      let publicDeckList: Deck[] = [];
+      if (user) {
+        myOwn = allDecks.filter((d) => d.creator_id === user.id);
+        publicDeckList = allDecks.filter((d) => d.visibility === 'public');
+      } else {
+        publicDeckList = allDecks;
+      }
+
+      // 4. 合并所有 deck id，一次 getDeckStatsBulk 替代两次
+      const allDeckIds = [...myOwn, ...publicDeckList].map((d) => d.id);
+      const statsMap = allDeckIds.length > 0
+        ? await getDeckStatsBulk(allDeckIds).catch(() => new Map<string, DeckStats>())
+        : new Map<string, DeckStats>();
+
+      const enrich = (decks: Deck[]): DeckWithProgress[] =>
+        decks.map((d) => {
+          const s = statsMap.get(d.id);
+          const mastered = s?.mastered ?? 0;
+          const total = s?.total ?? 0;
+          const percent = total > 0 ? Math.round((mastered / total) * 100) : 0;
+          return { ...d, mastered, total, percent };
+        });
+
+      setMyDecks(enrich(myOwn));
+      setPublicDecks(enrich(publicDeckList));
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
