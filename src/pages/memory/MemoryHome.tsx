@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import {
   createDeck,
-  getDeckStats,
+  getDeckStatsBulk,
   getDecks,
   getUserMemoryStats,
 } from '../../lib/cards';
@@ -68,13 +68,14 @@ export default function MemoryHome() {
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState<string | null>(null);
 
-  // 并行获取每个牌组的 stats，计算掌握进度
+  // 批量获取每个牌组的 stats，计算掌握进度
   const fetchProgress = async (decks: Deck[]): Promise<DeckWithProgress[]> => {
-    const statsArr = await Promise.all(
-      decks.map((d) => getDeckStats(d.id).catch(() => null)),
+    if (decks.length === 0) return [];
+    const statsMap = await getDeckStatsBulk(decks.map((d) => d.id)).catch(
+      () => new Map<string, DeckStats>(),
     );
-    return decks.map((d, i) => {
-      const s: DeckStats | null = statsArr[i];
+    return decks.map((d) => {
+      const s = statsMap.get(d.id);
       const mastered = s?.mastered ?? 0;
       const total = s?.total ?? 0;
       const percent = total > 0 ? Math.round((mastered / total) * 100) : 0;

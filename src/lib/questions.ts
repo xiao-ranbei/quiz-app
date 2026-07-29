@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { getCached, invalidate } from './cache';
 import type {
   Category,
   Question,
@@ -9,13 +10,30 @@ import type {
   ExamSession,
 } from '../types';
 
+// 分类列表缓存 key 与 TTL（5 分钟）
+const CATEGORIES_CACHE_KEY = 'categories';
+const CATEGORIES_TTL = 5 * 60 * 1000;
+
 export async function getCategories(): Promise<Category[]> {
-  const { data, error } = await supabase
-    .from('categories')
-    .select('*')
-    .order('name', { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+  return getCached(
+    CATEGORIES_CACHE_KEY,
+    async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    CATEGORIES_TTL,
+  );
+}
+
+/**
+ * 主动失效分类缓存（在新增/删除分类后调用）
+ */
+export function invalidateCategories(): void {
+  invalidate(CATEGORIES_CACHE_KEY);
 }
 
 export async function getQuestions(params: {
@@ -109,12 +127,14 @@ export async function insertCategory(name: string, description?: string): Promis
     .select()
     .single();
   if (error) throw error;
+  invalidateCategories();
   return data as Category;
 }
 
 export async function deleteCategory(id: string): Promise<void> {
   const { error } = await supabase.from('categories').delete().eq('id', id);
   if (error) throw error;
+  invalidateCategories();
 }
 
 export async function updateQuestion(
@@ -149,15 +169,11 @@ export async function getOrCreateCategory(name: string): Promise<Category> {
 }
 
 export async function getCategoryQuestionCounts(): Promise<Map<string, number>> {
-  const { data, error } = await supabase
-    .from('questions')
-    .select('category_id');
+  const { data, error } = await supabase.rpc('get_category_question_counts');
   if (error) throw error;
   const counts = new Map<string, number>();
-  (data ?? []).forEach((q) => {
-    if (q.category_id) {
-      counts.set(q.category_id, (counts.get(q.category_id) || 0) + 1);
-    }
+  (data ?? []).forEach((row: { category_id: string; count: number }) => {
+    counts.set(row.category_id, Number(row.count));
   });
   return counts;
 }
@@ -217,14 +233,15 @@ export async function saveExamSession(params: {
         session_id: sessionId,
       })),
     );
-    for (const a of params.answers) {
-      if (!a.isCorrect) {
-        await supabase.rpc('upsert_wrong_book', {
+    const wrongAnswers = params.answers.filter((a) => !a.isCorrect);
+    await Promise.all(
+      wrongAnswers.map((a) =>
+        supabase.rpc('upsert_wrong_book', {
           p_user_id: params.userId,
           p_question_id: a.questionId,
-        });
-      }
-    }
+        }),
+      ),
+    );
   }
 
   return { sessionId, score };
@@ -236,24 +253,17 @@ export async function getUserStats(userId: string): Promise<{
   wrongCount: number;
   examCount: number;
 }> {
-  const [historyRes, wrongRes, examRes] = await Promise.all([
-    supabase
-      .from('user_history')
-      .select('is_correct', { count: 'exact' })
-      .eq('user_id', userId),
-    supabase.from('wrong_book').select('id', { count: 'exact' }).eq('user_id', userId),
-    supabase
-      .from('exam_sessions')
-      .select('id', { count: 'exact' })
-      .eq('user_id', userId),
-  ]);
-
-  const history = (historyRes.data ?? []) as Array<{ is_correct: boolean }>;
+  const { data, error } = await supabase.rpc('get_user_stats', { p_user_id: userId });
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    return { totalAnswered: 0, correct: 0, wrongCount: 0, examCount: 0 };
+  }
+  const row = data[0];
   return {
-    totalAnswered: history.length,
-    correct: history.filter((h) => h.is_correct).length,
-    wrongCount: wrongRes.count ?? 0,
-    examCount: examRes.count ?? 0,
+    totalAnswered: Number(row.total_answered),
+    correct: Number(row.correct),
+    wrongCount: Number(row.wrong_count),
+    examCount: Number(row.exam_count),
   };
 }
 
@@ -289,6 +299,9 @@ export async function getExamSessions(userId: string): Promise<ExamSession[]> {
 // 管理员邮箱列表 - 只有这些邮箱可以删除题目
 const ADMIN_EMAILS = new Set(['xiao_ranbei@outlook.com']);
 
+// 管理员判定缓存：按 user.id 缓存，TTL 30 分钟（覆盖一次登录会话）
+const ADMIN_TTL = 30 * 60 * 1000;
+
 /**
  * 判断当前登录用户是否为管理员
  * 1) 检查 user_profiles 表是否标记为 admin
@@ -297,21 +310,28 @@ const ADMIN_EMAILS = new Set(['xiao_ranbei@outlook.com']);
 export async function isCurrentUserAdmin(): Promise<boolean> {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return false;
-  const email = data.user.email?.toLowerCase() ?? '';
-  if (ADMIN_EMAILS.has(email)) return true;
-
-  // 尝试从 user_profiles 表读取 role_key（若迁移已启用）
-  try {
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('role_key')
-      .eq('id', data.user.id)
-      .maybeSingle();
-    if (profile && (profile as any).role_key === 'admin') return true;
-  } catch {
-    // 表不存在或无权限时忽略
-  }
-  return false;
+  const userId = data.user.id;
+  const cacheKey = `admin:${userId}`;
+  return getCached(
+    cacheKey,
+    async () => {
+      const email = data.user.email?.toLowerCase() ?? '';
+      if (ADMIN_EMAILS.has(email)) return true;
+      // 尝试从 user_profiles 表读取 role_key（若迁移已启用）
+      try {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role_key')
+          .eq('id', userId)
+          .maybeSingle();
+        if (profile && (profile as any).role_key === 'admin') return true;
+      } catch {
+        // 表不存在或无权限时忽略
+      }
+      return false;
+    },
+    ADMIN_TTL,
+  );
 }
 
 /**

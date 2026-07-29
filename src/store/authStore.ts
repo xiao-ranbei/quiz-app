@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { clearAll } from '../lib/cache';
 
 interface AuthState {
   user: User | null;
@@ -51,6 +52,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setAuth: (session, user) => set({ session, user, loading: false, error: null }),
   signOut: async () => {
     await supabase.auth.signOut();
+    clearAll(); // 清空所有客户端缓存（categories / admin 等）
     set({ user: null, session: null, error: null });
   },
 }));

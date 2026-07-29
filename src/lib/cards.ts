@@ -498,6 +498,107 @@ export async function getDeckStats(deckId: string): Promise<DeckStats> {
 }
 
 /**
+ * 批量获取多个牌组的统计（替代逐 deck 调用 getDeckStats，消除 N+1）
+ *
+ * 实现：2 次查询
+ * 1. cards 表按 deck_id IN (...) 拉全部卡的 id, deck_id（按 deck 分组得 total）
+ * 2. card_user_states 表按 card_id IN (...) + user_id 拉状态（按 card_id 映射回 deck_id 聚合得 learned/mastered/dueToday）
+ *
+ * @param deckIds 牌组 ID 列表
+ * @returns Map<deckId, DeckStats>
+ */
+export async function getDeckStatsBulk(
+  deckIds: string[],
+): Promise<Map<string, DeckStats>> {
+  const result = new Map<string, DeckStats>();
+  if (deckIds.length === 0) return result;
+
+  // 查询1：拉所有 deck 的卡片 id + deck_id
+  const { data: cards, error: cardsErr } = await supabase
+    .from('cards')
+    .select('id, deck_id')
+    .in('deck_id', deckIds);
+  if (cardsErr) throw cardsErr;
+
+  const cardList = (cards ?? []) as Array<{ id: string; deck_id: string }>;
+  // cardId → deckId 映射；同时按 deck 聚合 total
+  const cardIdToDeckId = new Map<string, string>();
+  const totalByDeck = new Map<string, number>();
+  for (const c of cardList) {
+    cardIdToDeckId.set(c.id, c.deck_id);
+    totalByDeck.set(c.deck_id, (totalByDeck.get(c.deck_id) ?? 0) + 1);
+  }
+
+  // 初始化每个 deck 的统计（确保无卡 / 无 state 的 deck 也有 entry）
+  // 未登录用户：learned/mastered/dueToday 全 0，newCards = total
+  const userId = await getCurrentUserId();
+  if (!userId || cardIdToDeckId.size === 0) {
+    for (const deckId of deckIds) {
+      const total = totalByDeck.get(deckId) ?? 0;
+      result.set(deckId, {
+        total,
+        learned: 0,
+        mastered: 0,
+        dueToday: 0,
+        newCards: total,
+      });
+    }
+    return result;
+  }
+
+  // 查询2：拉该用户在这些 card 上的所有 state
+  const allCardIds = Array.from(cardIdToDeckId.keys());
+  const { data: states, error: statesErr } = await supabase
+    .from('card_user_states')
+    .select('card_id, repetitions, interval_days, due')
+    .eq('user_id', userId)
+    .in('card_id', allCardIds);
+  if (statesErr) throw statesErr;
+
+  const stateList = (states ?? []) as Array<{
+    card_id: string;
+    repetitions: number;
+    interval_days: number;
+    due: string;
+  }>;
+
+  // 按 deck 聚合 learned / mastered / dueToday
+  const learnedByDeck = new Map<string, number>();
+  const masteredByDeck = new Map<string, number>();
+  const dueByDeck = new Map<string, number>();
+  const nowIso = new Date().toISOString();
+
+  for (const s of stateList) {
+    const deckId = cardIdToDeckId.get(s.card_id);
+    if (!deckId) continue;
+    learnedByDeck.set(deckId, (learnedByDeck.get(deckId) ?? 0) + 1);
+    if (s.repetitions >= 3 && s.interval_days >= 21) {
+      masteredByDeck.set(deckId, (masteredByDeck.get(deckId) ?? 0) + 1);
+    }
+    if (s.due <= nowIso) {
+      dueByDeck.set(deckId, (dueByDeck.get(deckId) ?? 0) + 1);
+    }
+  }
+
+  // 写回结果
+  for (const deckId of deckIds) {
+    const total = totalByDeck.get(deckId) ?? 0;
+    const learned = learnedByDeck.get(deckId) ?? 0;
+    const mastered = masteredByDeck.get(deckId) ?? 0;
+    const dueToday = dueByDeck.get(deckId) ?? 0;
+    result.set(deckId, {
+      total,
+      learned,
+      mastered,
+      dueToday,
+      newCards: total - learned,
+    });
+  }
+
+  return result;
+}
+
+/**
  * 获取用户在背诵模块的整体统计
  * - dueToday: 该 user 所有 due <= now 的 state 数量
  * - newToday: 默认配额 20（简化处理）
