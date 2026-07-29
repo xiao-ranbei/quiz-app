@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { BookOpen, LogIn, LogOut, Menu, X, User, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useModeStore } from '../store/modeStore';
+import ModeSwitch from './ModeSwitch';
 
-const navItems = [
+const quizNavItems = [
   { to: '/', label: '首页' },
   { to: '/questions', label: '题库' },
-  { to: '/memory', label: '背诵' },
   { to: '/practice', label: '练习' },
   { to: '/exam', label: '考试' },
   { to: '/wrong', label: '错题本' },
@@ -14,9 +15,19 @@ const navItems = [
   { to: '/me', label: '我的' },
 ];
 
+const memoryNavItems = [
+  { to: '/memory', label: '背诵首页' },
+  { to: '/me', label: '我的' },
+];
+
+// 未选择模式时的完整导航（降级兼容）
+const allNavItems = [...quizNavItems.slice(0, -1), { to: '/memory', label: '背诵' }, ...quizNavItems.slice(-1)];
+
 export default function Navbar() {
   const { user, signOut } = useAuthStore();
+  const { mode } = useModeStore();
   const navigate = useNavigate();
+  const navItems = mode === 'memory' ? memoryNavItems : mode === 'quiz' ? quizNavItems : allNavItems;
   const [menuOpen, setMenuOpen] = useState(false);
   const [isDark, setIsDark] = useState(() =>
     document.documentElement.classList.contains('dark')
@@ -70,6 +81,7 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden md:flex items-center gap-2">
+          <ModeSwitch />
           <button
             onClick={toggleTheme}
             className="p-2 rounded-md transition-colors text-theme-secondary hover:text-theme-primary hover:bg-theme-hover"
@@ -134,6 +146,7 @@ export default function Navbar() {
               </NavLink>
             ))}
             <div className="mt-2 pt-2 border-t border-theme flex items-center gap-2">
+              <ModeSwitch />
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-md text-theme-secondary hover:text-theme-primary hover:bg-theme-hover"

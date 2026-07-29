@@ -64,7 +64,7 @@
   - `programmatic` TR-6.2: npm run build 成功
   - `programmatic` TR-6.3: 现有单元测试通过
 
-## [ ] Task 7: 部署迁移 + 提交推送
+## [x] Task 7: 部署迁移 + 提交推送
 - **Priority**: high
 - **Depends On**: Task 6
 - **Description**: supabase db push 部署 RPC，git commit + push

@@ -15,8 +15,12 @@ import MemoryStudy from './pages/memory/MemoryStudy';
 import AddCard from './pages/memory/AddCard';
 import { initAuth } from './store/authStore';
 import ToastContainer from './components/Toast';
+import ModeSelectModal from './components/ModeSelectModal';
+import { useModeStore } from './store/modeStore';
 
 export default function App() {
+  const { mode } = useModeStore();
+
   useEffect(() => {
     initAuth();
   }, []);
@@ -47,6 +51,7 @@ export default function App() {
           © {new Date().getFullYear()} Quiz App
         </footer>
         <ToastContainer />
+        <ModeSelectModal />
       </div>
     </HashRouter>
   );
