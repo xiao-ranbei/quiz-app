@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { Card, ReviewMode } from '../types';
-import { getTodayReviewQueue, submitReview as submitReviewApi } from '../lib/cards';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// 降级方案：若 RPC API 不可用，可回退到 getTodayReviewQueue / submitReview
+import {
+  fetchStudyQueue,
+  submitReviewRpc,
+  getTodayReviewQueue as _getTodayReviewQueueLegacy,
+  submitReview as _submitReviewApiLegacy,
+} from '../lib/cards';
+/* eslint-enable @typescript-eslint/no-unused-vars */
 import { toast } from './toastStore';
 
 const SESSION_KEY = 'memory-study-session';
@@ -89,7 +97,7 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
   start: async (deckId, mode) => {
     set({ isLoading: true, error: null });
     try {
-      const queue = await getTodayReviewQueue(deckId);
+      const queue = await fetchStudyQueue(deckId);
       const startTime = Date.now();
       const next = {
         deckId,
@@ -182,7 +190,7 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
     if (!currentCard) return;
 
     try {
-      await submitReviewApi(currentCard.id, get().mode, quality, userAnswer);
+      await submitReviewRpc(currentCard.id, get().mode, quality, userAnswer);
       // 更新统计：quality >= 3 视为正确
       set((s) => ({
         correctCount: quality >= 3 ? s.correctCount + 1 : s.correctCount,

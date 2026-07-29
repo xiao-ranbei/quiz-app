@@ -12,20 +12,14 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import {
-  createDeck,
-  getDeckStatsBulk,
-  getDecks,
-  getUserMemoryStats,
-} from '../../lib/cards';
+import { createDeck, fetchMemoryHomeData } from '../../lib/cards';
 import { useAuthStore } from '../../store/authStore';
 import { useRequireAuth } from '../../store/useRequireAuth';
 import Loading from '../../components/Loading';
 import type {
   CardType,
-  Deck,
   DeckInput,
-  DeckStats,
+  DeckWithStats,
   Lang,
   MemoryStats,
   Visibility,
@@ -37,9 +31,7 @@ import {
 } from '../../types';
 
 // 牌组卡片所需的进度信息
-interface DeckWithProgress extends Deck {
-  mastered: number;
-  total: number;
+interface DeckWithProgress extends DeckWithStats {
   percent: number;
 }
 
@@ -72,47 +64,26 @@ export default function MemoryHome() {
   const loadingRef = useRef(false);
 
   const loadData = async () => {
-    // StrictMode 防护：同一时刻只允许一次加载
     if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
     try {
-      // 1. 拉取整体统计（3 次查询，但仅一次调用）
-      const memoryStatsPromise = getUserMemoryStats().catch(() => null);
-
-      // 2. 拉取牌组：登录用户用 creator_id（返回公开+私有），游客只拉公开
-      const decksPromise = user
-        ? getDecks({ creator_id: user.id })
-        : getDecks({ visibility: 'public' });
-
-      const [memoryStats, allDecks] = await Promise.all([
-        memoryStatsPromise,
-        decksPromise,
-      ]);
+      const {
+        stats: memoryStats,
+        myDecks: myOwn,
+        publicDecks: publicDeckList,
+      } = await fetchMemoryHomeData().catch(() => ({
+        stats: null,
+        myDecks: [] as DeckWithStats[],
+        publicDecks: [] as DeckWithStats[],
+      }));
 
       if (memoryStats) setStats(memoryStats);
 
-      // 3. 在内存中拆分牌组，一次批量查进度
-      let myOwn: Deck[] = [];
-      let publicDeckList: Deck[] = [];
-      if (user) {
-        myOwn = allDecks.filter((d) => d.creator_id === user.id);
-        publicDeckList = allDecks.filter((d) => d.visibility === 'public');
-      } else {
-        publicDeckList = allDecks;
-      }
-
-      // 4. 合并所有 deck id，一次 getDeckStatsBulk 替代两次
-      const allDeckIds = [...myOwn, ...publicDeckList].map((d) => d.id);
-      const statsMap = allDeckIds.length > 0
-        ? await getDeckStatsBulk(allDeckIds).catch(() => new Map<string, DeckStats>())
-        : new Map<string, DeckStats>();
-
-      const enrich = (decks: Deck[]): DeckWithProgress[] =>
+      const enrich = (decks: DeckWithStats[]): DeckWithProgress[] =>
         decks.map((d) => {
-          const s = statsMap.get(d.id);
-          const mastered = s?.mastered ?? 0;
-          const total = s?.total ?? 0;
+          const mastered = d.mastered ?? 0;
+          const total = d.total ?? 0;
           const percent = total > 0 ? Math.round((mastered / total) * 100) : 0;
           return { ...d, mastered, total, percent };
         });

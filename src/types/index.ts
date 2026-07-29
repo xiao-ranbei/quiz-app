@@ -204,6 +204,24 @@ export interface SM2Result extends SM2State {
   due: Date;
 }
 
+// 带统计的牌组（聚合 RPC 返回）
+export interface DeckWithStats {
+  id: string;
+  name: string;
+  description: string | null;
+  lang: Lang;
+  card_type: CardType;
+  visibility: Visibility;
+  creator_id: string | null;
+  created_at: string;
+  updated_at: string;
+  total: number;
+  learned: number;
+  mastered: number;
+  dueToday: number;
+  newCards: number;
+}
+
 // 牌组筛选
 export interface DeckFilter {
   visibility?: Visibility;

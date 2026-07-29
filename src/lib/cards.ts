@@ -4,6 +4,7 @@ import type {
   Deck, Card, CardUserState, CardReview,
   MemoryStats, DeckStats, ReviewHistoryItem,
   DeckFilter, CardInput, DeckInput, ReviewMode, SM2State,
+  DeckWithStats,
 } from '../types';
 
 // 复用 questions.ts 中的管理员判定（邮箱白名单 + user_profiles.role_key 双重判定）
@@ -718,4 +719,156 @@ function formatDate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+// ============================================================
+// SubTask 5: RPC 聚合调用
+// ============================================================
+
+/**
+ * 获取背诵模块首页聚合数据（一次 RPC 调用返回统计 + 我的牌组 + 公开牌组）
+ *
+ * 对应 SQL：`public.get_memory_home_data()`
+ *
+ * @returns { stats: MemoryStats; myDecks: DeckWithStats[]; publicDecks: DeckWithStats[] }
+ * @throws RPC 调用失败时抛出异常
+ */
+export async function fetchMemoryHomeData(): Promise<{
+  stats: MemoryStats;
+  myDecks: DeckWithStats[];
+  publicDecks: DeckWithStats[];
+}> {
+  const { data, error } = await supabase.rpc('get_memory_home_data');
+  if (error) throw error;
+
+  const raw = data as unknown as {
+    stats: MemoryStats;
+    my_decks: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      lang: string;
+      card_type: string;
+      visibility: string;
+      total: number;
+      learned: number;
+      mastered: number;
+      dueToday: number;
+      newCards: number;
+    }>;
+    public_decks: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      lang: string;
+      card_type: string;
+      visibility: string;
+      total: number;
+      learned: number;
+      mastered: number;
+      dueToday: number;
+      newCards: number;
+    }>;
+  };
+
+  const mapDeck = (row: typeof raw.my_decks[number]): DeckWithStats => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    lang: row.lang as DeckWithStats['lang'],
+    card_type: row.card_type as DeckWithStats['card_type'],
+    visibility: row.visibility as DeckWithStats['visibility'],
+    creator_id: null,
+    created_at: '',
+    updated_at: '',
+    total: row.total,
+    learned: row.learned,
+    mastered: row.mastered,
+    dueToday: row.dueToday,
+    newCards: row.newCards,
+  });
+
+  return {
+    stats: raw.stats,
+    myDecks: (raw.my_decks ?? []).map(mapDeck),
+    publicDecks: (raw.public_decks ?? []).map(mapDeck),
+  };
+}
+
+/**
+ * 获取指定牌组的今日学习队列（一次 RPC 调用返回到期卡 + 新卡）
+ *
+ * 对应 SQL：`public.get_study_queue(p_deck_id, p_new_card_limit)`
+ *
+ * @param deckId 牌组 ID
+ * @param newCardLimit 新卡配额（默认 20）
+ * @returns 卡片数组（到期卡按 due 升序，新卡按创建时间升序）
+ * @throws RPC 调用失败时抛出异常
+ */
+export async function fetchStudyQueue(
+  deckId: string,
+  newCardLimit = 20,
+): Promise<Card[]> {
+  const { data, error } = await supabase.rpc('get_study_queue', {
+    p_deck_id: deckId,
+    p_new_card_limit: newCardLimit,
+  });
+  if (error) throw error;
+
+  const list = (data as unknown as Array<{
+    id: string;
+    front: string;
+    back: string;
+    deck_id: string;
+    metadata?: unknown;
+    tags?: string[];
+  }>) ?? [];
+
+  return list.map((c) => ({
+    id: c.id,
+    deck_id: c.deck_id,
+    front: c.front,
+    back: c.back,
+    metadata: (c.metadata ?? {}) as Card['metadata'],
+    tags: c.tags ?? [],
+    creator_id: null,
+    created_at: '',
+  }));
+}
+
+/**
+ * 提交一次复习记录（一次 RPC 调用完成 SM-2 调度计算 + upsert state + 插入 review）
+ *
+ * 对应 SQL：`public.submit_review(p_card_id, p_mode, p_quality, p_user_answer)`
+ *
+ * @param cardId 卡片 ID
+ * @param mode 复习模式
+ * @param quality 回答质量 0-5
+ * @param userAnswer 用户作答内容（可选）
+ * @returns 更新后的调度状态和复习记录
+ * @throws RPC 调用失败时抛出异常（如未登录）
+ */
+export async function submitReviewRpc(
+  cardId: string,
+  mode: ReviewMode,
+  quality: number,
+  userAnswer?: string,
+): Promise<{ state: CardUserState; review: CardReview }> {
+  const { data, error } = await supabase.rpc('submit_review', {
+    p_card_id: cardId,
+    p_mode: mode,
+    p_quality: quality,
+    p_user_answer: userAnswer ?? null,
+  });
+  if (error) throw error;
+
+  const raw = data as unknown as {
+    state: CardUserState;
+    review: CardReview;
+  };
+
+  return {
+    state: raw.state,
+    review: raw.review,
+  };
 }
