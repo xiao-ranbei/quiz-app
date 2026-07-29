@@ -25,7 +25,7 @@ const allNavItems = [...quizNavItems.slice(0, -1), { to: '/memory', label: 'èƒŒè
 
 export default function Navbar() {
   const { user, signOut } = useAuthStore();
-  const { mode } = useModeStore();
+  const { mode, clearMode } = useModeStore();
   const navigate = useNavigate();
   const navItems = mode === 'memory' ? memoryNavItems : mode === 'quiz' ? quizNavItems : allNavItems;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -56,10 +56,10 @@ export default function Navbar() {
   return (
     <header className="bg-theme-card border-b border-theme sticky top-0 z-40 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 text-brand-600 dark:text-brand-300 hover:opacity-80">
+        <button onClick={clearMode} className="flex items-center gap-2 text-brand-600 dark:text-brand-300 hover:opacity-80">
           <BookOpen className="w-6 h-6" />
           <span className="font-semibold text-lg text-theme-primary">Quiz</span>
-        </Link>
+        </button>
 
         <nav className="hidden md:flex items-center gap-1">
           {navItems.map((item) => (

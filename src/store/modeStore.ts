@@ -13,6 +13,7 @@ function getInitialMode(): AppMode | null {
 interface ModeState {
   mode: AppMode | null;
   setMode: (mode: AppMode) => void;
+  clearMode: () => void;
 }
 
 export const useModeStore = create<ModeState>((set) => ({
@@ -20,5 +21,9 @@ export const useModeStore = create<ModeState>((set) => ({
   setMode: (mode) => {
     localStorage.setItem(MODE_STORAGE_KEY, mode);
     set({ mode });
+  },
+  clearMode: () => {
+    localStorage.removeItem(MODE_STORAGE_KEY);
+    set({ mode: null });
   },
 }));
