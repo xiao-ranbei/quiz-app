@@ -4,7 +4,7 @@ import type {
   Deck, Card, CardUserState, CardReview,
   MemoryStats, DeckStats, ReviewHistoryItem,
   DeckFilter, CardInput, DeckInput, ReviewMode, SM2State,
-  DeckWithStats,
+  DeckWithStats, RecentReview,
 } from '../types';
 import { useAuthStore } from '../store/authStore';
 
@@ -616,13 +616,13 @@ export async function getDeckStatsBulk(
 export async function getUserMemoryStats(): Promise<MemoryStats> {
   const userId = await getCurrentUserId();
   if (!userId) {
-    return { dueToday: 0, newToday: 20, mastered: 0, totalCards: 0 };
+    return { dueToday: 0, newToday: 20, mastered: 0, totalCards: 0, learning: 0, studyDays: 0 };
   }
 
   const nowIso = new Date().toISOString();
 
-  // 并行 3 次 count 查询（只返回数字，不拉全量行）
-  const [dueRes, masteredRes, decksRes] = await Promise.all([
+  // 并行 5 次 count 查询（只返回数字，不拉全量行）
+  const [dueRes, masteredRes, learningRes, studyDaysRes, decksRes] = await Promise.all([
     // dueToday：到期卡数
     supabase
       .from('card_user_states')
@@ -636,6 +636,17 @@ export async function getUserMemoryStats(): Promise<MemoryStats> {
       .eq('user_id', userId)
       .gte('repetitions', 3)
       .gte('interval_days', 21),
+    // learning：所有 state 数（总学习卡片数），后面减去 mastered 得在学数
+    supabase
+      .from('card_user_states')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId),
+    // studyDays：去重的 reviewed_at 日期数
+    supabase
+      .from('card_reviews')
+      .select('reviewed_at')
+      .eq('user_id', userId)
+      .order('reviewed_at', { ascending: false }),
     // 可见 deck id 列表
     supabase
       .from('decks')
@@ -645,10 +656,22 @@ export async function getUserMemoryStats(): Promise<MemoryStats> {
 
   if (dueRes.error) throw dueRes.error;
   if (masteredRes.error) throw masteredRes.error;
+  if (learningRes.error) throw learningRes.error;
+  if (studyDaysRes.error) throw studyDaysRes.error;
   if (decksRes.error) throw decksRes.error;
 
   const dueToday = dueRes.count ?? 0;
   const mastered = masteredRes.count ?? 0;
+  // learning: 所有 state 数 - mastered 数
+  const totalStates = learningRes.count ?? 0;
+  const learning = Math.max(0, totalStates - mastered);
+  // studyDays: reviewed_at 按日期去重计数
+  const studyDaysSet = new Set(
+    (studyDaysRes.data ?? []).map((r: { reviewed_at: string }) =>
+      new Date(r.reviewed_at).toISOString().slice(0, 10)
+    )
+  );
+  const studyDays = studyDaysSet.size;
 
   // 统计可见 deck 的卡片总数
   const deckIds = (decksRes.data ?? []).map((d: { id: string }) => d.id);
@@ -667,6 +690,8 @@ export async function getUserMemoryStats(): Promise<MemoryStats> {
     newToday: 20,
     mastered,
     totalCards,
+    learning,
+    studyDays,
   };
 }
 
@@ -875,5 +900,143 @@ export async function submitReviewRpc(
   return {
     state: raw.state,
     review: raw.review,
+  };
+}
+
+// ============================================================
+// SubTask 5.2: Profile 页聚合数据 + 最近复习
+// ============================================================
+
+/**
+ * 获取最近 N 条复习记录，JOIN cards 取 front/back
+ *
+ * @param limit 返回条数，默认 20
+ */
+export async function getRecentReviews(limit = 20): Promise<RecentReview[]> {
+  const userId = await getCurrentUserId();
+  if (!userId) return [];
+
+  const { data, error } = await supabase
+    .from('card_reviews')
+    .select('id, card_id, mode, quality, reviewed_at, cards!card_reviews_card_id_fkey(id, front, back)')
+    .eq('user_id', userId)
+    .order('reviewed_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    // 回退：先查 reviews，再逐个查 cards（若 FK join 语法不兼容）
+    const { data: rows, error: err2 } = await supabase
+      .from('card_reviews')
+      .select('id, card_id, mode, quality, reviewed_at')
+      .eq('user_id', userId)
+      .order('reviewed_at', { ascending: false })
+      .limit(limit);
+    if (err2) throw err2;
+    if (!rows || rows.length === 0) return [];
+    const cardIds = Array.from(new Set(rows.map((r) => r.card_id)));
+    const { data: cardRows, error: cErr } = await supabase
+      .from('cards')
+      .select('id, front, back')
+      .in('id', cardIds);
+    if (cErr) throw cErr;
+    const cardMap = new Map(
+      (cardRows ?? []).map((c) => [c.id, { front: c.front, back: c.back }])
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      card_id: r.card_id,
+      front: cardMap.get(r.card_id)?.front ?? '',
+      back: cardMap.get(r.card_id)?.back ?? '',
+      mode: r.mode as ReviewMode,
+      quality: r.quality,
+      reviewed_at: r.reviewed_at,
+    }));
+  }
+
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    card_id: r.card_id,
+    front: (r as any).cards?.front ?? '',
+    back: (r as any).cards?.back ?? '',
+    mode: r.mode as ReviewMode,
+    quality: r.quality,
+    reviewed_at: r.reviewed_at,
+  }));
+}
+
+/**
+ * 获取背诵模块 Profile 页聚合数据：一次 RPC 调用返回所有所需数据
+ *
+ * 对应 SQL：`public.get_memory_profile_data(p_history_days, p_recent_limit)`
+ *
+ * 若 RPC 未部署，降级为并行 3 次调用：
+ *   - fetchMemoryHomeData（stats + myDecks）
+ *   - getReviewHistory
+ *   - getRecentReviews
+ *
+ * @returns stats + myDecks + reviewHistory + recentReviews
+ */
+export async function fetchMemoryProfileData(
+  historyDays = 7,
+  recentLimit = 20,
+): Promise<{
+  stats: MemoryStats;
+  myDecks: DeckWithStats[];
+  reviewHistory: ReviewHistoryItem[];
+  recentReviews: RecentReview[];
+}> {
+  // 优先用 RPC 聚合
+  try {
+    const { data, error } = await supabase.rpc('get_memory_profile_data', {
+      p_history_days: historyDays,
+      p_recent_limit: recentLimit,
+    });
+    if (!error && data) {
+      const raw = data as unknown as {
+        stats: MemoryStats;
+        my_decks: DeckWithStats[];
+        review_history: ReviewHistoryItem[];
+        recent_reviews: RecentReview[];
+      };
+
+      const mapDeck = (row: any): DeckWithStats => ({
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        lang: row.lang as DeckWithStats['lang'],
+        card_type: row.card_type as DeckWithStats['card_type'],
+        visibility: row.visibility as DeckWithStats['visibility'],
+        creator_id: null,
+        created_at: '',
+        updated_at: '',
+        total: row.total,
+        learned: row.learned,
+        mastered: row.mastered,
+        dueToday: row.dueToday,
+        newCards: row.newCards,
+      });
+
+      return {
+        stats: raw.stats,
+        myDecks: (raw.my_decks ?? []).map(mapDeck),
+        reviewHistory: raw.review_history ?? [],
+        recentReviews: raw.recent_reviews ?? [],
+      };
+    }
+  } catch {
+    // RPC 未部署时走降级
+  }
+
+  // 降级：并行多次请求
+  const [homeRes, reviewHistory, recentReviews] = await Promise.all([
+    fetchMemoryHomeData(),
+    getReviewHistory(historyDays),
+    getRecentReviews(recentLimit),
+  ]);
+  return {
+    stats: homeRes.stats,
+    myDecks: homeRes.myDecks,
+    reviewHistory,
+    recentReviews,
   };
 }

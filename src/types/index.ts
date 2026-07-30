@@ -179,12 +179,25 @@ export interface CardReview {
   reviewed_at: string;
 }
 
-// 模块首页统计
+// 模块首页/个人中心统计
 export interface MemoryStats {
   dueToday: number;       // 今日待复习
   newToday: number;       // 今日新卡配额
   mastered: number;       // 已掌握（repetitions >= 3 且 interval >= 21）
   totalCards: number;
+  learning: number;       // 在学：已学但未掌握
+  studyDays: number;      // 去重复习日期数（学习总天数）
+}
+
+/** 最近复习记录：card_reviews JOIN cards */
+export interface RecentReview {
+  id: string;             // review id
+  card_id: string;
+  front: string;
+  back: string;
+  mode: ReviewMode;
+  quality: number;        // 0-5
+  reviewed_at: string;
 }
 
 // 牌组维度统计
