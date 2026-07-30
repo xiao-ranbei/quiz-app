@@ -16,6 +16,7 @@ import { createDeck, fetchMemoryHomeData } from '../../lib/cards';
 import { useAuthStore } from '../../store/authStore';
 import { useRequireAuth } from '../../store/useRequireAuth';
 import Loading from '../../components/Loading';
+import ImportApkg from '../../components/ImportApkg';
 import type {
   CardType,
   DeckInput,
@@ -205,19 +206,30 @@ export default function MemoryHome() {
           </p>
         </div>
         {user ? (
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 text-sm bg-brand-600 hover:bg-brand-500 text-white rounded-md flex items-center gap-1.5 shrink-0"
-          >
-            <Plus className="w-4 h-4" /> 新建牌组
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <ImportApkg onImported={loadData} />
+            <button
+              onClick={() => setShowCreate(true)}
+              className="px-4 py-2 text-sm bg-brand-600 hover:bg-brand-500 text-white rounded-md flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" /> 新建牌组
+            </button>
+          </div>
         ) : (
-          <button
-            onClick={() => requireAuth('请登录后创建牌组')}
-            className="px-4 py-2 text-sm bg-theme-card border border-theme text-theme-secondary hover:bg-theme-hover rounded-md flex items-center gap-1.5 shrink-0"
-          >
-            <Plus className="w-4 h-4" /> 新建牌组
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => requireAuth('请登录后导入 .apkg 文件')}
+              className="px-4 py-2 text-sm bg-theme-card border border-theme text-theme-secondary hover:bg-theme-hover rounded-md flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" /> 导入 .apkg
+            </button>
+            <button
+              onClick={() => requireAuth('请登录后创建牌组')}
+              className="px-4 py-2 text-sm bg-theme-card border border-theme text-theme-secondary hover:bg-theme-hover rounded-md flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" /> 新建牌组
+            </button>
+          </div>
         )}
       </section>
 

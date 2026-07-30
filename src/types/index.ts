@@ -121,6 +121,15 @@ export interface SentenceMetadata {
 
 export type CardMetadata = JaWordMetadata | EnWordMetadata | GrammarMetadata | SentenceMetadata | Record<string, unknown>;
 
+// 牌组元数据（apkg 导入相关）
+export interface DeckMetadata {
+  source?: string;            // 来源标记，如 'apkg'
+  apkg_path?: string;         // 原始 apkg 在 Storage 中的路径
+  anki_deck_id?: number;      // Anki 内部 deck id
+  media_map?: Record<string, string>;  // { filename: index } 音频懒加载用
+  [key: string]: unknown;
+}
+
 // 牌组
 export interface Deck {
   id: string;
@@ -130,6 +139,7 @@ export interface Deck {
   card_type: CardType;
   visibility: Visibility;
   creator_id: string | null;
+  metadata?: DeckMetadata;
   created_at: string;
   updated_at: string;
 }
@@ -213,6 +223,7 @@ export interface DeckWithStats {
   card_type: CardType;
   visibility: Visibility;
   creator_id: string | null;
+  metadata?: DeckMetadata;
   created_at: string;
   updated_at: string;
   total: number;

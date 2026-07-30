@@ -15,6 +15,7 @@ import { normalizeAnswer } from '../../lib/utils';
 import { getDeck } from '../../lib/cards';
 import EmptyState from '../../components/EmptyState';
 import Loading from '../../components/Loading';
+import AudioPlayer from '../../components/AudioPlayer';
 
 // 顶部模式切换按钮配置
 const MODE_LIST: { mode: ReviewMode; label: string; icon: typeof Layers }[] = [
@@ -41,6 +42,36 @@ function shuffle<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+// 从卡片 metadata 中提取音频文件名和读音信息（apkg 导入的卡片）
+function getCardAudioMeta(card: Card): {
+  audio?: string;
+  exampleAudio?: string;
+  reading?: string;
+  pitch?: string;
+  pos?: string;
+  example?: string;
+  exampleReading?: string;
+  exampleZh?: string;
+} {
+  const meta = card.metadata as Record<string, unknown>;
+  const result: Record<string, string> = {};
+  for (const key of ['audio', 'example_audio', 'reading', 'pitch', 'pos', 'example', 'example_reading', 'example_zh']) {
+    if (typeof meta[key] === 'string' && meta[key]) {
+      result[key] = meta[key] as string;
+    }
+  }
+  return {
+    audio: result.audio,
+    exampleAudio: result.example_audio,
+    reading: result.reading,
+    pitch: result.pitch,
+    pos: result.pos,
+    example: result.example,
+    exampleReading: result.example_reading,
+    exampleZh: result.example_zh,
+  };
 }
 
 // 用时格式化 mm:ss
@@ -434,70 +465,139 @@ export default function MemoryStudy() {
       )}
 
       {/* ============ SubTask 9.4: 闪卡模式 ============ */}
-      {renderMode === 'flashcard' && (
-        <>
-          <button
-            type="button"
-            onClick={() => flip()}
-            className="w-full text-left rounded-xl border border-theme bg-theme-card p-8 min-h-[280px] flex flex-col items-center justify-center transition-colors hover:bg-theme-hover cursor-pointer"
-          >
-            <div className="text-xs text-theme-muted mb-4">
-              {isFlipped ? '背面（答案）' : '正面'}
-            </div>
-            <div className="text-2xl md:text-3xl text-theme-primary text-center leading-relaxed whitespace-pre-wrap break-all">
-              {isFlipped ? current.back : current.front}
-            </div>
-            {!isFlipped && (
-              <div className="mt-6 text-xs text-theme-muted">
-                点击卡片翻转查看答案
+      {renderMode === 'flashcard' && (() => {
+        const audioMeta = getCardAudioMeta(current);
+        return (
+          <>
+            <button
+              type="button"
+              onClick={() => flip()}
+              className="w-full text-left rounded-xl border border-theme bg-theme-card p-8 min-h-[280px] flex flex-col items-center justify-center transition-colors hover:bg-theme-hover cursor-pointer"
+            >
+              <div className="text-xs text-theme-muted mb-4">
+                {isFlipped ? '背面（答案）' : '正面'}
+              </div>
+              <div className="text-2xl md:text-3xl text-theme-primary text-center leading-relaxed whitespace-pre-wrap break-all">
+                {isFlipped ? current.back : current.front}
+              </div>
+
+              {/* 正面：显示读音 + 音频按钮 */}
+              {!isFlipped && (audioMeta.reading || audioMeta.audio) && (
+                <div className="mt-3 flex items-center gap-2">
+                  {audioMeta.reading && (
+                    <span className="text-base text-theme-secondary">
+                      {audioMeta.reading}
+                    </span>
+                  )}
+                  {audioMeta.audio && deckId && (
+                    <AudioPlayer
+                      deckId={deckId}
+                      filename={audioMeta.audio}
+                      size="md"
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* 背面：显示例句 + 例句音频 */}
+              {isFlipped && (audioMeta.example || audioMeta.exampleAudio || audioMeta.exampleZh) && (
+                <div className="mt-4 max-w-full text-center space-y-1">
+                  {audioMeta.example && (
+                    <div className="text-sm text-theme-secondary whitespace-pre-wrap break-all">
+                      {audioMeta.example}
+                    </div>
+                  )}
+                  {audioMeta.exampleReading && (
+                    <div className="text-xs text-theme-muted">
+                      {audioMeta.exampleReading}
+                    </div>
+                  )}
+                  {audioMeta.exampleZh && (
+                    <div className="text-xs text-theme-muted">
+                      {audioMeta.exampleZh}
+                    </div>
+                  )}
+                  {audioMeta.exampleAudio && deckId && (
+                    <div className="flex justify-center pt-1">
+                      <AudioPlayer
+                        deckId={deckId}
+                        filename={audioMeta.exampleAudio}
+                        size="sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!isFlipped && (
+                <div className="mt-6 text-xs text-theme-muted">
+                  点击卡片翻转查看答案
+                </div>
+              )}
+            </button>
+
+            {isFlipped && (
+              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleFlashcardGrade(0)}
+                  className="px-4 py-2.5 text-sm rounded-md bg-rose-600 hover:bg-rose-500 text-white"
+                >
+                  不记得
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleFlashcardGrade(3)}
+                  className="px-4 py-2.5 text-sm rounded-md bg-amber-600 hover:bg-amber-500 text-white"
+                >
+                  困难
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleFlashcardGrade(4)}
+                  className="px-4 py-2.5 text-sm rounded-md bg-blue-600 hover:bg-blue-500 text-white"
+                >
+                  良好
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleFlashcardGrade(5)}
+                  className="px-4 py-2.5 text-sm rounded-md bg-emerald-600 hover:bg-emerald-500 text-white"
+                >
+                  简单
+                </button>
               </div>
             )}
-          </button>
-
-          {isFlipped && (
-            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-              <button
-                type="button"
-                onClick={() => handleFlashcardGrade(0)}
-                className="px-4 py-2.5 text-sm rounded-md bg-rose-600 hover:bg-rose-500 text-white"
-              >
-                不记得
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFlashcardGrade(3)}
-                className="px-4 py-2.5 text-sm rounded-md bg-amber-600 hover:bg-amber-500 text-white"
-              >
-                困难
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFlashcardGrade(4)}
-                className="px-4 py-2.5 text-sm rounded-md bg-blue-600 hover:bg-blue-500 text-white"
-              >
-                良好
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFlashcardGrade(5)}
-                className="px-4 py-2.5 text-sm rounded-md bg-emerald-600 hover:bg-emerald-500 text-white"
-              >
-                简单
-              </button>
-            </div>
-          )}
-        </>
-      )}
+          </>
+        );
+      })()}
 
       {/* ============ SubTask 9.5: 选择题模式 ============ */}
-      {renderMode === 'choice' && (
+      {renderMode === 'choice' && (() => {
+        const audioMeta = getCardAudioMeta(current);
+        return (
         <div className="rounded-xl border border-theme bg-theme-card p-6">
           <div className="text-xs text-theme-muted mb-3">
             根据正面选择正确的背面
           </div>
-          <h2 className="text-xl md:text-2xl text-theme-primary leading-relaxed whitespace-pre-wrap break-all mb-5">
-            {current.front}
-          </h2>
+          <div className="flex items-start gap-3 mb-5">
+            <h2 className="flex-1 text-xl md:text-2xl text-theme-primary leading-relaxed whitespace-pre-wrap break-all">
+              {current.front}
+            </h2>
+            {audioMeta.reading && (
+              <span className="text-sm text-theme-secondary shrink-0 mt-1">
+                {audioMeta.reading}
+              </span>
+            )}
+            {audioMeta.audio && deckId && (
+              <AudioPlayer
+                deckId={deckId}
+                filename={audioMeta.audio}
+                size="md"
+                className="shrink-0 mt-1"
+              />
+            )}
+          </div>
           <div className="space-y-2">
             {choiceOptions.map((opt, idx) => {
               const isSelected = selectedOption === opt.back;
@@ -550,10 +650,13 @@ export default function MemoryStudy() {
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* ============ SubTask 9.6: 拼写模式 ============ */}
-      {renderMode === 'typing' && (
+      {renderMode === 'typing' && (() => {
+        const audioMeta = getCardAudioMeta(current);
+        return (
         <div className="rounded-xl border border-theme bg-theme-card p-6">
           <div className="text-xs text-theme-muted mb-3">
             拼写：根据背面输入正面（front）
@@ -604,8 +707,20 @@ export default function MemoryStudy() {
               >
                 {isCorrect ? '✓ 回答正确' : '✗ 回答错误'}
               </div>
-              <div className="text-sm text-theme-secondary">
-                正确答案：<span className="font-medium">{current.front}</span>
+              <div className="text-sm text-theme-secondary flex items-center gap-2 flex-wrap">
+                <span>
+                  正确答案：<span className="font-medium">{current.front}</span>
+                </span>
+                {audioMeta.reading && (
+                  <span className="text-theme-muted">[{audioMeta.reading}]</span>
+                )}
+                {audioMeta.audio && deckId && (
+                  <AudioPlayer
+                    deckId={deckId}
+                    filename={audioMeta.audio}
+                    size="sm"
+                  />
+                )}
               </div>
               {userAnswer && (
                 <div className="text-sm text-theme-muted mt-1">
@@ -624,10 +739,13 @@ export default function MemoryStudy() {
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* ============ SubTask 9.7: 听写模式 ============ */}
-      {renderMode === 'dictation' && (
+      {renderMode === 'dictation' && (() => {
+        const audioMeta = getCardAudioMeta(current);
+        return (
         <div className="rounded-xl border border-theme bg-theme-card p-6">
           <div className="text-xs text-theme-muted mb-3">
             听写：听录音后输入正面（front）
@@ -643,6 +761,14 @@ export default function MemoryStudy() {
               <Volume2 className="w-4 h-4 mr-1.5" />
               重听
             </button>
+            {audioMeta.audio && deckId && (
+              <AudioPlayer
+                deckId={deckId}
+                filename={audioMeta.audio}
+                size="sm"
+                className="inline-flex"
+              />
+            )}
             <button
               type="button"
               onClick={handleTypingReveal}
@@ -693,8 +819,13 @@ export default function MemoryStudy() {
               >
                 {isCorrect ? '✓ 回答正确' : '✗ 回答错误'}
               </div>
-              <div className="text-sm text-theme-secondary">
-                正确答案：<span className="font-medium">{current.front}</span>
+              <div className="text-sm text-theme-secondary flex items-center gap-2 flex-wrap">
+                <span>
+                  正确答案：<span className="font-medium">{current.front}</span>
+                </span>
+                {audioMeta.reading && (
+                  <span className="text-theme-muted">[{audioMeta.reading}]</span>
+                )}
               </div>
               {userAnswer && (
                 <div className="text-sm text-theme-muted mt-1">
@@ -713,7 +844,8 @@ export default function MemoryStudy() {
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
