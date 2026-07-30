@@ -7,3 +7,7 @@ dist
 .vite
 supabase/.temp
 *.tsbuildinfo
+
+# Anki apkg 测试文件（大型二进制，不应入版本控制）
+docs/*.apkg
+docs/apkg_extracted/

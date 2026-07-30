@@ -16,8 +16,10 @@ import { toast } from '../store/toastStore';
 
 const STAGE_LABEL: Record<ImportStage, string> = {
   idle: '准备中',
+  unpacking: '解压中...',
   uploading: '上传中...',
-  parsing: '解析导入中...',
+  parsing: '解析 SQLite...',
+  importing: '写入数据库...',
   done: '导入完成',
   error: '导入失败',
 };
@@ -70,7 +72,11 @@ export default function ImportApkg({ onImported }: ImportApkgProps) {
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const isWorking = stage === 'uploading' || stage === 'parsing';
+  const isWorking =
+    stage === 'unpacking' ||
+    stage === 'uploading' ||
+    stage === 'parsing' ||
+    stage === 'importing';
 
   return (
     <>
