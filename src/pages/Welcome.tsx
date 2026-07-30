@@ -1,4 +1,5 @@
-import { Brain, ClipboardList, BookOpen, Check, Zap, Sparkles, Target, TrendingUp } from 'lucide-react';
+import { useState } from 'react';
+import { Brain, ClipboardList, BookOpen, Check, Zap, Sparkles, Target, TrendingUp, Sun, Moon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useModeStore } from '../store/modeStore';
 
@@ -26,6 +27,24 @@ const highlights = [
 export default function Welcome() {
   const { setMode } = useModeStore();
   const navigate = useNavigate();
+  const [isDark, setIsDark] = useState(() =>
+    document.documentElement.classList.contains('dark')
+  );
+
+  const toggleTheme = () => {
+    const html = document.documentElement;
+    if (html.classList.contains('dark')) {
+      html.classList.remove('dark');
+      html.classList.add('light');
+      localStorage.setItem('theme', 'light');
+      setIsDark(false);
+    } else {
+      html.classList.remove('light');
+      html.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+      setIsDark(true);
+    }
+  };
 
   const handleSelect = (mode: 'quiz' | 'memory') => {
     setMode(mode);
@@ -33,9 +52,20 @@ export default function Welcome() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
+    <div className="min-h-screen relative">
+      {/* Hero 区右上角主题切换 */}
+      <div className="absolute top-4 right-4 md:top-6 md:right-6 z-10">
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-full bg-theme-card/60 backdrop-blur border border-theme text-theme-secondary hover:text-theme-primary hover:bg-theme-hover transition"
+          title={isDark ? '切换到浅色模式' : '切换到深色模式'}
+        >
+          {isDark ? <Sun className="w-4 h-4 md:w-5 md:h-5" /> : <Moon className="w-4 h-4 md:w-5 md:h-5" />}
+        </button>
+      </div>
+
       {/* Hero 区 */}
-      <section className="relative overflow-hidden py-20 px-4">
+      <section className="relative overflow-hidden py-20 md:py-28 px-4">
         <div
           className="absolute inset-0 -z-10 opacity-60"
           style={{
@@ -45,13 +75,13 @@ export default function Welcome() {
         />
         <div className="max-w-3xl mx-auto text-center">
           <div className="flex items-center justify-center gap-3 mb-6">
-            <BookOpen className="w-12 h-12 text-brand-600 dark:text-brand-300" />
-            <h1 className="text-5xl font-bold text-brand-600 dark:text-brand-300">Quiz</h1>
+            <BookOpen className="w-12 h-12 md:w-14 md:h-14 text-brand-600 dark:text-brand-300" />
+            <h1 className="text-5xl md:text-6xl font-bold text-brand-600 dark:text-brand-300">Quiz</h1>
           </div>
-          <h2 className="text-2xl font-semibold text-theme-primary mb-4">
+          <h2 className="text-2xl md:text-3xl font-semibold text-theme-primary mb-4">
             刷题与背诵，一站搞定
           </h2>
-          <p className="text-base text-theme-muted max-w-2xl mx-auto leading-relaxed">
+          <p className="text-base md:text-lg text-theme-muted max-w-2xl mx-auto leading-relaxed">
             无论是对抗遗忘的间隔复习，还是模拟实战的题库练习，Quiz 都能帮你高效记忆、巩固知识。
           </p>
         </div>
