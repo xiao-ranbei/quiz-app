@@ -44,13 +44,15 @@ export default function ImportApkg({ onImported }: ImportApkgProps) {
       return;
     }
 
-    const MAX_SIZE = 100 * 1024 * 1024; // 100MB
-    if (file.size > MAX_SIZE) {
-      toast.error('文件超过 100MB 限制，请选择更小的文件');
-      return;
-    }
-    if (file.size > 50 * 1024 * 1024) {
-      toast.warning('文件较大，导入可能需要较长时间，请耐心等待');
+    // 文件大小预检：不限制最大（大文件会自动上传占位文件），仅提醒
+    const sizeMB = file.size / 1024 / 1024;
+    if (sizeMB > 100) {
+      toast.warning(
+        `文件 ${sizeMB.toFixed(1)}MB 超过 100MB，原始文件将不保存，仅导入文本和音频索引`,
+        6000,
+      );
+    } else if (sizeMB > 50) {
+      toast.warning(`文件较大（${sizeMB.toFixed(0)}MB），导入可能需要较长时间，请耐心等待`);
     }
 
     setStage('uploading');
