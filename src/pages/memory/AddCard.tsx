@@ -31,8 +31,7 @@ const defaultSingleForm = {
   romaji: "",
   phonetic: "",
   pos: "",
-  example_ja: "",
-  example_en: "",
+  example: "",
   example_zh: "",
   translation: "",
   notes: "",
@@ -56,28 +55,20 @@ interface AiCardItem {
  */
 function getMetadataFields(lang: Lang, cardType: CardType): FieldDef[] {
   if (cardType === "word") {
-    if (lang === "ja") {
-      return [
-        { key: "reading", label: "假名注音", placeholder: "ねこ" },
-        { key: "romaji", label: "罗马音", placeholder: "neko" },
-        { key: "example_ja", label: "日语例句", placeholder: "猫は寝ている。", textarea: true },
-        { key: "example_zh", label: "中文翻译", placeholder: "猫在睡觉。", textarea: true },
-      ];
-    }
+    // 统一字段（日语/英语通用），按语言调整 label 和 placeholder
+    const isJa = lang === "ja";
     return [
-      { key: "phonetic", label: "音标", placeholder: "/əˈbændən/" },
-      { key: "pos", label: "词性", placeholder: "verb / noun" },
-      { key: "example_en", label: "英语例句", placeholder: "Don't abandon hope.", textarea: true },
-      { key: "example_zh", label: "中文翻译", placeholder: "不要放弃希望。", textarea: true },
+      isJa
+        ? { key: "reading", label: "假名注音", placeholder: "ねこ" }
+        : { key: "phonetic", label: "音标", placeholder: "/əˈbændən/" },
+      { key: "pos", label: "词性", placeholder: isJa ? "名詞 / 動詞" : "verb / noun" },
+      { key: "example", label: isJa ? "日语例句" : "英语例句", placeholder: isJa ? "猫は寝ている。" : "Don't abandon hope.", textarea: true },
+      { key: "example_zh", label: "中文翻译", placeholder: "猫在睡觉。", textarea: true },
     ];
   }
   if (cardType === "grammar") {
     return [
-      {
-        key: lang === "ja" ? "example_ja" : "example_en",
-        label: lang === "ja" ? "日语例句" : "英语例句",
-        textarea: true,
-      },
+      { key: "example", label: lang === "ja" ? "日语例句" : "英语例句", textarea: true },
       { key: "example_zh", label: "中文翻译", textarea: true },
       { key: "notes", label: "用法备注", textarea: true },
     ];
@@ -99,8 +90,7 @@ function buildMetadata(form: typeof defaultSingleForm): Record<string, unknown> 
     "romaji",
     "phonetic",
     "pos",
-    "example_ja",
-    "example_en",
+    "example",
     "example_zh",
     "translation",
     "notes",
@@ -725,13 +715,13 @@ export default function AddCard() {
 
 JSON：
 [
-  { "front": "猫", "back": "猫", "metadata": { "reading": "ねこ" }, "tags": ["JLPT-N5"] },
+  { "front": "猫", "back": "猫", "metadata": { "reading": "ねこ", "pos": "名詞" }, "tags": ["JLPT-N5"] },
   { "front": "犬", "back": "狗", "metadata": { "reading": "いぬ" } }
 ]
 
 CSV（首行表头，tags 用 | 分隔）：
-front,back,reading,romaji,tags
-猫,猫,ねこ,neko,JLPT-N5|动物
+front,back,reading,pos,example,example_zh,tags
+猫,猫,ねこ,名詞,猫は寝ている。,猫在睡觉。,JLPT-N5|动物
 犬,狗,いぬ,inu,JLPT-N5|动物`}
                 className={`input-theme w-full font-mono text-sm ${
                   batchInvalidRows.length > 0 ? "border-rose-500" : ""

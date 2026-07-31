@@ -89,10 +89,9 @@ Deno.serve(async (req) => {
 1. 严格返回 JSON 格式：{"cards": [{front, back, metadata, tags?}]}
 2. front 是${langLabel}原文（单词/语法点/短句）
 3. back 是中文释义或解释
-4. metadata 字段按卡片类型填充：
-   - 日语单词：{reading, romaji, example_ja, example_zh}
-   - 英语单词：{phonetic, pos, example_en, example_zh}
-   - 语法：{example_ja/example_en, example_zh, notes}
+4. metadata 字段按卡片类型填充（日语/英语统一结构）：
+   - 单词：{pos, reading(日语假名注音)或 phonetic(英语音标), example, example_zh}
+   - 语法：{example, example_zh, notes}
    - 短句：{translation, notes}
 5. tags 是字符串数组，可包含难度等级（如 JLPT-N3、CET-6）等
 6. 不要包含任何 markdown 代码块标记，直接返回纯 JSON`;

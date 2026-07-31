@@ -33,8 +33,10 @@ export interface ImportOptions {
   cardType?: 'word' | 'grammar' | 'sentence';
 }
 
-// 字段映射：Anki 字段名 → 目标字段
-const FIELD_MAP: Record<string, string> = {
+// ---- 预设字段映射：Anki 字段名 → 目标 key ----
+
+// 日语 Vocab 模型（大厂日语句典）
+const JA_VOCAB_MAP: Record<string, string> = {
   VocabKanji: 'front',
   VocabDefSC: 'back',
   VocabFurigana: 'reading',
@@ -46,6 +48,119 @@ const FIELD_MAP: Record<string, string> = {
   SentDefSC1: 'example_zh',
   SentAudio1: 'example_audio',
 };
+
+// 英语常见模型（Word/Phonetic/PoS/Definition/Example 系列）
+const EN_VOCAB_MAP: Record<string, string> = {
+  Word: 'front',
+  Term: 'front',
+  Phonetic: 'phonetic',
+  IPA: 'phonetic',
+  PoS: 'pos',
+  PartOfSpeech: 'pos',
+  'Part of Speech': 'pos',
+  Definition: 'back',
+  Meaning: 'back',
+  Def: 'back',
+  Example: 'example',
+  Sentence: 'example',
+  Translation: 'example_zh',
+  ExampleZh: 'example_zh',
+  Synonyms: 'synonyms',
+  Audio: 'audio',
+};
+
+// 语义关键词规则：用于通用模型的字段名 → 目标 key 识别
+const SEMANTIC_RULES: Array<{ match: RegExp; target: string }> = [
+  // 发音
+  { match: /(furigana|kana|reading|yomi|よみ)/i,            target: 'reading' },
+  { match: /(romaji|roman|ローマ字)/i,                       target: 'romaji' },
+  { match: /(phonetic|pronunciation|ipa|音标?)/i,           target: 'phonetic' },
+  { match: /(pitch|accent|intonation|音调?|ピッチ)/i,       target: 'pitch' },
+  // 词性
+  { match: /^(pos|partofspeech|part of speech|词性|品詞)$/i, target: 'pos' },
+  // 释义
+  { match: /(meaning|definition|def|translation|释义|意味|翻訳|訳)/i, target: 'meaning' },
+  // 例句
+  { match: /^(example|sentence|例文)$/i,                     target: 'example' },
+  { match: /(example_reading|sentence_reading)/i,            target: 'example_reading' },
+  { match: /(example.*?zh|example.*?cn|中文.*?例|例文.*?訳)/i, target: 'example_zh' },
+  // 音频
+  { match: /^(audio|sound|mp3|voice|音声)$/i,                target: 'audio' },
+  { match: /(example.?audio|sentence.?audio|例文.*?音声)/i,  target: 'example_audio' },
+  // 其他
+  { match: /(synonym|同義語|類義語)/i,                        target: 'synonyms' },
+  { match: /(note|comment|remark|usage|メモ|備考|注記)/i,    target: 'notes' },
+];
+
+interface AnkiModel {
+  id: number;
+  name: string;
+  flds: Array<{ name: string; ord: number }>;
+}
+
+interface ModelMapping {
+  fieldMap: Record<string, string>;    // Anki 字段名 → target key
+  fieldIndexMap: Record<string, number>; // Anki 字段名 → ord 索引
+  genericMode: boolean;
+}
+
+/** 根据模型字段名自动选择映射策略 */
+function resolveModelMapping(model: AnkiModel): ModelMapping {
+  const fieldNames = model.flds.map((f) => f.name);
+  const fieldIndexMap = Object.fromEntries(model.flds.map((f) => [f.name, f.ord]));
+
+  // 检测：日语 Vocab 模型（优先）
+  if (fieldNames.some((n) => n === 'VocabKanji')) {
+    return { fieldMap: JA_VOCAB_MAP, fieldIndexMap, genericMode: false };
+  }
+
+  // 检测：英语 Vocab 模型（含 Word/Phonetic/PoS/Definition 中至少 2 个）
+  const enKeys = ['Word', 'Phonetic', 'PoS', 'PartOfSpeech', 'Definition'];
+  const enHits = enKeys.filter((k) => fieldNames.includes(k)).length;
+  if (enHits >= 2) {
+    return { fieldMap: EN_VOCAB_MAP, fieldIndexMap, genericMode: false };
+  }
+
+  // 通用模型：走语义关键词识别
+  return { fieldMap: buildSemanticMap(fieldNames), fieldIndexMap, genericMode: true };
+}
+
+/** 通用映射：通过关键词语义识别字段名 → target key */
+function buildSemanticMap(fieldNames: string[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  let frontSet = false;
+  let backSet = false;
+
+  for (let i = 0; i < fieldNames.length; i++) {
+    const raw = fieldNames[i];
+
+    // 前两字段默认 front/back（如果未被语义规则抢先匹配）
+    if (!frontSet && i === 0) { result[raw] = 'front'; frontSet = true; continue; }
+    if (!backSet && i === 1)  { result[raw] = 'back';  backSet  = true; continue; }
+
+    // 语义规则匹配
+    let matched = false;
+    for (const rule of SEMANTIC_RULES) {
+      if (rule.match.test(raw)) {
+        result[raw] = rule.target;
+        matched = true;
+        break;
+      }
+    }
+
+    // 兜底：保留清洗后的原字段名做 key
+    if (!matched) {
+      const cleanKey = raw
+        .replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+        .toLowerCase();
+      result[raw] = cleanKey || `field_${i}`;
+    }
+  }
+
+  return result;
+}
 
 const ANKI_FIELD_SEP = '\x1f';  // Anki flds 字段分隔符
 
@@ -92,7 +207,7 @@ interface ParsedDeck {
  * 1. 用 JSZip 解压 .apkg
  * 2. 读取 media（JSON）和 collection.anki21 / collection.anki2（SQLite）
  * 3. 用 sql.js 解析 SQLite：读取 col.decks / col.models / notes / cards
- * 4. 查找 Vocab 模型，按字段名映射
+ * 4. 为每个模型自动选择映射策略（日语 Vocab / 英语 Vocab / 通用语义识别）
  * 5. 反转 media 索引：{ filename: mediaKey }
  */
 async function parseApkg(
@@ -152,21 +267,12 @@ async function parseApkg(
       { id: number; name: string; flds: Array<{ name: string; ord: number }> }
     >;
 
-    // 5. 查找 Vocab 模型（含 VocabKanji 字段）
-    let vocabModelId: string | null = null;
+    // 5. 为每个模型构建映射（支持一个 apkg 内多种模型混合）
+    const modelMaps = new Map<string, ModelMapping>();
     for (const [mid, model] of Object.entries(modelsJson)) {
-      if (model.flds?.some((f) => f.name === 'VocabKanji')) {
-        vocabModelId = mid;
-        break;
+      if (model.flds?.length) {
+        modelMaps.set(mid, resolveModelMapping(model as AnkiModel));
       }
-    }
-
-    // 构建字段名 → ord 索引映射
-    let fieldIndexMap: Record<string, number> = {};
-    if (vocabModelId && modelsJson[vocabModelId]) {
-      fieldIndexMap = Object.fromEntries(
-        modelsJson[vocabModelId].flds.map((f) => [f.name, f.ord]),
-      );
     }
 
     // 6. 读取所有 notes
@@ -209,35 +315,46 @@ async function parseApkg(
         const note = noteMap.get(nid);
         if (!note) continue;
 
+        const mapping = modelMaps.get(note.mid);
+        if (!mapping) continue;
+
         let front = '';
         let back = '';
         const metadata: Record<string, unknown> = {};
 
-        if (vocabModelId && note.mid === vocabModelId) {
-          // Vocab 模型：按字段名映射
-          for (const [fieldName, targetKey] of Object.entries(FIELD_MAP)) {
-            const idx = fieldIndexMap[fieldName];
-            if (idx === undefined || idx >= note.flds.length) continue;
-            const value = note.flds[idx];
-            if (!value) continue;
+        // 按映射处理每个字段
+        for (const [ankiField, targetKey] of Object.entries(mapping.fieldMap)) {
+          const idx = mapping.fieldIndexMap[ankiField];
+          if (idx === undefined || idx >= note.flds.length) continue;
+          const value = note.flds[idx];
+          if (!value) continue;
 
-            if (targetKey === 'front') {
-              front = stripSoundTags(value);
-            } else if (targetKey === 'back') {
-              back = stripSoundTags(value);
-            } else if (targetKey === 'audio' || targetKey === 'example_audio') {
-              const filename = extractAudioFilename(value);
-              if (filename) metadata[targetKey] = filename;
-            } else {
-              metadata[targetKey] = value;
-            }
+          if (targetKey === 'front') {
+            front = stripSoundTags(value);
+          } else if (targetKey === 'back') {
+            back = stripSoundTags(value);
+          } else if (targetKey === 'audio' || targetKey === 'example_audio') {
+            const filename = extractAudioFilename(value);
+            if (filename) metadata[targetKey] = filename;
+          } else {
+            metadata[targetKey] = stripSoundTags(value);
           }
-        } else {
-          // 其他模型：通用映射，前两个字段作 front/back
-          front = stripSoundTags(note.flds[0] ?? '');
-          back = stripSoundTags(note.flds[1] ?? '');
-          for (let i = 2; i < note.flds.length; i++) {
-            if (note.flds[i]) metadata[`field_${i}`] = note.flds[i];
+        }
+
+        // 通用模式下：补充未被 fieldMap 覆盖的 Anki 字段
+        if (mapping.genericMode) {
+          const mappedFields = new Set(Object.keys(mapping.fieldMap));
+          for (let i = 0; i < note.flds.length; i++) {
+            const fieldName = mapping.fieldIndexMap
+              ? Object.entries(mapping.fieldIndexMap).find(([, ord]) => ord === i)?.[0]
+              : null;
+            if (fieldName && mappedFields.has(fieldName)) continue;
+            if (note.flds[i] && !metadata[`field_${i}`]) {
+              // 已被语义映射覆盖的跳过
+              const targetKey = mapping.fieldMap[fieldName ?? ''];
+              if (targetKey) continue;
+              metadata[`field_${i}`] = stripSoundTags(note.flds[i]);
+            }
           }
         }
 

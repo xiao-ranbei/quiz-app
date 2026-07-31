@@ -89,37 +89,48 @@ export type CardType = 'word' | 'grammar' | 'sentence';
 export type ReviewMode = 'flashcard' | 'choice' | 'typing' | 'dictation';
 export type Visibility = 'public' | 'private';
 
-// 卡片元数据 - 日语单词
-export interface JaWordMetadata {
-  reading?: string;      // 假名注音，如 "ねこ"
-  romaji?: string;       // 罗马音，如 "neko"
-  example_ja?: string;   // 日语例句
-  example_zh?: string;   // 中文例句翻译
-}
-
-// 卡片元数据 - 英语单词
-export interface EnWordMetadata {
-  phonetic?: string;     // 音标，如 "/əˈbændən/"
-  pos?: string;          // 词性，如 "verb"、"noun"
-  example_en?: string;   // 英语例句
-  example_zh?: string;   // 中文例句翻译
+// 卡片元数据 - 单词（日语/英语统一）
+export interface WordMetadata {
+  // 词性（日语：名詞/動詞/形容詞；英语：noun/verb/adjective）
+  pos?: string;
+  // 发音相关
+  reading?: string;          // 日语假名注音，如 "ねこ"
+  romaji?: string;           // 日语罗马音，如 "neko"
+  phonetic?: string;         // 英语音标，如 "/əˈbændən/"
+  pitch?: string;            // 日语音调，如 "01"
+  // 释义
+  meaning?: string;          // 补充释义文本
+  // 例句
+  example?: string;          // 例句原文（日语/英语均用此 key）
+  example_reading?: string;  // 例句注音/音标
+  example_zh?: string;       // 例句中文翻译
+  // 音频
+  audio?: string;            // 单词音频文件名
+  example_audio?: string;    // 例句音频文件名
+  // 其他通用
+  synonyms?: string;         // 同义词/近义词
+  notes?: string;            // 备注/用法提示
+  // 兜底（向后兼容旧字段 + 扩展）
+  [key: string]: unknown;
 }
 
 // 卡片元数据 - 语法
 export interface GrammarMetadata {
-  example_ja?: string;
-  example_en?: string;
-  example_zh?: string;
-  notes?: string;        // 用法备注
+  example?: string;          // 例句原文（日语/英语均用此 key）
+  example_zh?: string;       // 例句中文翻译
+  notes?: string;            // 用法备注
+  pos?: string;              // 适用词性/语法点
+  [key: string]: unknown;
 }
 
 // 卡片元数据 - 短句
 export interface SentenceMetadata {
-  translation?: string;  // 翻译
+  translation?: string;      // 翻译
   notes?: string;
+  [key: string]: unknown;
 }
 
-export type CardMetadata = JaWordMetadata | EnWordMetadata | GrammarMetadata | SentenceMetadata | Record<string, unknown>;
+export type CardMetadata = WordMetadata | GrammarMetadata | SentenceMetadata | Record<string, unknown>;
 
 // 牌组元数据（apkg 导入相关）
 export interface DeckMetadata {

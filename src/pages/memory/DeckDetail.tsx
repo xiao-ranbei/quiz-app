@@ -309,19 +309,16 @@ export default function DeckDetail() {
     const meta = card.metadata ?? {};
     const items: { label: string; value: string }[] = [];
 
-    if (deck?.lang === 'ja') {
-      // 日语：reading、romaji、example_ja
-      const m = meta as { reading?: string; romaji?: string; example_ja?: string };
-      if (m.reading) items.push({ label: '读音', value: m.reading });
-      if (m.romaji) items.push({ label: '罗马音', value: m.romaji });
-      if (m.example_ja) items.push({ label: '例句', value: m.example_ja });
-    } else if (deck?.lang === 'en') {
-      // 英语：phonetic、pos、example_en
-      const m = meta as { phonetic?: string; pos?: string; example_en?: string };
-      if (m.phonetic) items.push({ label: '音标', value: m.phonetic });
-      if (m.pos) items.push({ label: '词性', value: m.pos });
-      if (m.example_en) items.push({ label: '例句', value: m.example_en });
-    }
+    // 统一读取（不再按语言分支）
+    const m = meta as Record<string, unknown>;
+    if (typeof m.reading === 'string' && m.reading) items.push({ label: '读音', value: m.reading });
+    if (typeof m.romaji === 'string' && m.romaji) items.push({ label: '罗马音', value: m.romaji });
+    if (typeof m.phonetic === 'string' && m.phonetic) items.push({ label: '音标', value: m.phonetic });
+    if (typeof m.pos === 'string' && m.pos) items.push({ label: '词性', value: m.pos });
+    if (typeof m.example === 'string' && m.example) items.push({ label: '例句', value: m.example });
+    // 向后兼容：旧数据可能存的是 example_ja / example_en
+    if (!m.example && typeof m.example_ja === 'string' && m.example_ja) items.push({ label: '例句', value: m.example_ja });
+    if (!m.example && typeof m.example_en === 'string' && m.example_en) items.push({ label: '例句', value: m.example_en });
 
     if (items.length === 0) return null;
 
