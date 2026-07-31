@@ -44,6 +44,15 @@ export default function ImportApkg({ onImported }: ImportApkgProps) {
       return;
     }
 
+    const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+    if (file.size > MAX_SIZE) {
+      toast.error('文件超过 100MB 限制，请选择更小的文件');
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.warning('文件较大，导入可能需要较长时间，请耐心等待');
+    }
+
     setStage('uploading');
     setMessage(`正在上传 ${file.name}...`);
     setResult(null);

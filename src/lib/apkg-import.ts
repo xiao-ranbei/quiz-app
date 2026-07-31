@@ -184,7 +184,7 @@ async function getSqlJs(): Promise<SqlJsStatic> {
     sqlJsPromise = initSqlJs({
       // 从 CDN 加载 wasm 文件
       locateFile: (file: string) =>
-        `https://cdn.jsdelivr.net/npm/sql.js@1.10.0/dist/${file}`,
+        `https://cdn.jsdelivr.net/npm/sql.js@1.14.1/dist/${file}`,
     });
   }
   return sqlJsPromise;
@@ -413,20 +413,33 @@ export async function importApkg(
   onProgress?.('uploading', `正在上传原始文件 ${file.name}...`);
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const objectPath = `${userId}/${Date.now()}-${safeName}`;
-
-  const { error: uploadErr } = await supabase.storage
-    .from('apkg-uploads')
-    .upload(objectPath, file, {
-      contentType: 'application/octet-stream',
-      cacheControl: '3600',
-      upsert: false,
-    });
-
-  if (uploadErr) {
-    throw new Error('上传文件失败: ' + uploadErr.message);
-  }
-
   const apkgPath = `apkg-uploads/${objectPath}`;
+
+  const MAX_UPLOAD_SIZE = 100 * 1024 * 1024; // 100MB（bucket 限制）
+  if (file.size > MAX_UPLOAD_SIZE) {
+    // 大文件：上传占位文件（Edge Function 只需要解析后的 JSON，不需要原始 .apkg）
+    const placeholder = new Blob(
+      [`placeholder for ${safeName} (${(file.size / 1024 / 1024).toFixed(1)} MB)`],
+      { type: 'text/plain' },
+    );
+    const { error: phErr } = await supabase.storage
+      .from('apkg-uploads')
+      .upload(objectPath, placeholder, {
+        contentType: 'text/plain',
+        cacheControl: '3600',
+        upsert: false,
+      });
+    if (phErr) throw new Error('上传占位文件失败: ' + phErr.message);
+  } else {
+    const { error: uploadErr } = await supabase.storage
+      .from('apkg-uploads')
+      .upload(objectPath, file, {
+        contentType: 'application/octet-stream',
+        cacheControl: '3600',
+        upsert: false,
+      });
+    if (uploadErr) throw new Error('上传文件失败: ' + uploadErr.message);
+  }
 
   // 3. 调用 Edge Function 写入数据库
   onProgress?.('importing', `正在写入 ${parsedDecks.length} 个牌组到数据库...`);
