@@ -1,14 +1,9 @@
 import { create } from 'zustand';
 import { Card, ReviewMode } from '../types';
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// 降级方案：若 RPC API 不可用，可回退到 getTodayReviewQueue / submitReview
 import {
   fetchStudyQueue,
   submitReviewRpc,
-  getTodayReviewQueue as _getTodayReviewQueueLegacy,
-  submitReview as _submitReviewApiLegacy,
-} from '../lib/cards';
-/* eslint-enable @typescript-eslint/no-unused-vars */
+} from '../lib/memory/review';
 import { toast } from './toastStore';
 
 const SESSION_KEY = 'memory-study-session';

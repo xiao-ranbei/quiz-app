@@ -374,56 +374,6 @@ export async function fetchHomeData(): Promise<{
 }
 
 /**
- * 获取 DeckDetail 页面数据（牌组+统计+历史+分页卡片）
- * 替代 getDeck + getDeckStats + getReviewHistory + getCards
- */
-export async function fetchDeckDetailData(
-  deckId: string,
-  page: number = 1,
-  pageSize: number = 20,
-  search?: string,
-): Promise<{
-  deck: import('../types').Deck | null;
-  stats: import('../types').DeckStats;
-  reviewHistory: import('../types').ReviewHistoryItem[];
-  cards: { data: import('../types').Card[]; total: number };
-}> {
-  const { data, error } = await supabase.rpc('get_deck_detail', {
-    p_deck_id: deckId,
-    p_page: page,
-    p_page_size: pageSize,
-    p_search: search ?? null,
-  });
-  if (error) throw error;
-  const raw = data as any;
-  return {
-    deck: raw.deck ? {
-      id: raw.deck.id,
-      name: raw.deck.name,
-      description: raw.deck.description,
-      lang: raw.deck.lang,
-      card_type: raw.deck.card_type,
-      visibility: raw.deck.visibility,
-      creator_id: raw.deck.creator_id,
-      created_at: raw.deck.created_at,
-      updated_at: raw.deck.updated_at,
-    } : null,
-    stats: {
-      total: raw.stats?.total ?? 0,
-      learned: raw.stats?.learned ?? 0,
-      mastered: raw.stats?.mastered ?? 0,
-      dueToday: raw.stats?.dueToday ?? 0,
-      newCards: raw.stats?.newCards ?? 0,
-    },
-    reviewHistory: (raw.reviewHistory ?? []) as import('../types').ReviewHistoryItem[],
-    cards: {
-      data: (raw.cards?.data ?? []) as import('../types').Card[],
-      total: raw.cards?.total ?? 0,
-    },
-  };
-}
-
-/**
  * 获取 Profile 页面数据（统计+考试+AI配置）
  * 替代 getUserStats + getExamSessions + getAIConfig
  */

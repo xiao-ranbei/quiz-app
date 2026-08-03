@@ -17,15 +17,12 @@ import type {
 } from '../../types';
 import {
   getDeck,
-  getCards,
-  getDeckStats,
-  getReviewHistory,
   updateDeck,
   deleteDeck,
-  deleteCard,
-  isCurrentUserAdmin,
-} from '../../lib/cards';
-import { fetchDeckDetailData } from '../../lib/questions';
+} from '../../lib/memory/decks';
+import { deleteCard } from '../../lib/memory/cards';
+import { fetchDeckDetailData } from '../../lib/memory/stats';
+import { isCurrentUserAdmin } from '../../lib/questions';
 import { useAuthStore } from '../../store/authStore';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';

@@ -12,7 +12,8 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import { createDeck, fetchMemoryHomeData } from '../../lib/cards';
+import { createDeck } from '../../lib/memory/decks';
+import { fetchMemoryHomeData } from '../../lib/memory/stats';
 import { useAuthStore } from '../../store/authStore';
 import { useRequireAuth } from '../../store/useRequireAuth';
 import Loading from '../../components/Loading';

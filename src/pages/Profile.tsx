@@ -10,7 +10,7 @@ import type {
 import { LANG_LABEL, CARD_TYPE_LABEL, REVIEW_MODE_LABEL } from '../types';
 import { getAIConfig, saveAIConfig, testAIConnection } from '../lib/ai';
 import { fetchProfileData } from '../lib/questions';
-import { fetchMemoryProfileData } from '../lib/cards';
+import { fetchMemoryProfileData } from '../lib/memory/stats';
 import { useAuthStore } from '../store/authStore';
 import type { AppMode } from '../store/modeStore';
 import { useModeStore } from '../store/modeStore';

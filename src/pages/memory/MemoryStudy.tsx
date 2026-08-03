@@ -12,7 +12,7 @@ import {
 import type { Card, Lang, ReviewMode } from '../../types';
 import { useMemoryStore } from '../../store/memoryStore';
 import { normalizeAnswer } from '../../lib/utils';
-import { getDeck } from '../../lib/cards';
+import { getDeck } from '../../lib/memory/decks';
 import EmptyState from '../../components/EmptyState';
 import Loading from '../../components/Loading';
 import AudioPlayer from '../../components/AudioPlayer';

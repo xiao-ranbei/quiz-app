@@ -7,15 +7,18 @@ import { useMemoryStore } from '../../store/memoryStore';
 import type { Card } from '../../types';
 
 // Mock 数据源，避免真实网络请求
-const cardsMock = vi.hoisted(() => ({
-  fetchStudyQueue: vi.fn(),
+const decksMock = vi.hoisted(() => ({
   getDeck: vi.fn(),
+}));
+const reviewMock = vi.hoisted(() => ({
+  fetchStudyQueue: vi.fn(),
 }));
 const apkgMock = vi.hoisted(() => ({
   extractAudio: vi.fn(),
 }));
 
-vi.mock('../../lib/cards', () => cardsMock);
+vi.mock('../../lib/memory/decks', () => decksMock);
+vi.mock('../../lib/memory/review', () => reviewMock);
 vi.mock('../../lib/apkg-import', () => apkgMock);
 
 const card: Card = {
@@ -33,8 +36,8 @@ const card: Card = {
 };
 
 beforeEach(() => {
-  cardsMock.fetchStudyQueue.mockResolvedValue([card]);
-  cardsMock.getDeck.mockResolvedValue({
+  reviewMock.fetchStudyQueue.mockResolvedValue([card]);
+  decksMock.getDeck.mockResolvedValue({
     id: 'deck1',
     name: '测试牌组',
     description: null,
@@ -94,7 +97,7 @@ describe('闪卡模式音频播放', () => {
         example_audio: 'example.mp3',
       },
     };
-    cardsMock.fetchStudyQueue.mockResolvedValue([cardWithExample]);
+    reviewMock.fetchStudyQueue.mockResolvedValue([cardWithExample]);
 
     const user = userEvent.setup();
     renderStudy();
@@ -123,7 +126,7 @@ describe('闪卡模式音频播放', () => {
 
 describe('空队列状态', () => {
   it('队列为空时显示“今日已完成”，而不是完成总结页', async () => {
-    cardsMock.fetchStudyQueue.mockResolvedValue([]);
+    reviewMock.fetchStudyQueue.mockResolvedValue([]);
     renderStudy();
 
     await waitFor(() => {

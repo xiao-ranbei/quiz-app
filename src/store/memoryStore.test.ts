@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMemoryStore } from './memoryStore';
 import type { Card } from '../types';
 
-const cardsMock = vi.hoisted(() => ({
+const reviewMock = vi.hoisted(() => ({
   fetchStudyQueue: vi.fn(),
   submitReviewRpc: vi.fn(),
 }));
 
-vi.mock('../lib/cards', () => cardsMock);
+vi.mock('../lib/memory/review', () => reviewMock);
 
 const card: Card = {
   id: 'c1',
@@ -27,7 +27,7 @@ beforeEach(() => {
 
 describe('memoryStore.start', () => {
   it('空队列时 isFinished 为 false（页面应显示“今日已完成”）', async () => {
-    cardsMock.fetchStudyQueue.mockResolvedValue([]);
+    reviewMock.fetchStudyQueue.mockResolvedValue([]);
     await useMemoryStore.getState().start('deck1', 'flashcard');
     const s = useMemoryStore.getState();
     expect(s.queue).toEqual([]);
@@ -36,7 +36,7 @@ describe('memoryStore.start', () => {
   });
 
   it('next 将进度写入 sessionStorage，restore 可恢复', async () => {
-    cardsMock.fetchStudyQueue.mockResolvedValue([
+    reviewMock.fetchStudyQueue.mockResolvedValue([
       card,
       { ...card, id: 'c2', front: '犬', back: '狗' },
     ]);
