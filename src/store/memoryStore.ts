@@ -67,6 +67,19 @@ function readSession(): SessionPayload | null {
   }
 }
 
+// 将当前 store 状态持久化到 sessionStorage
+function persistCurrent(s: MemoryStudyState) {
+  saveSession({
+    deckId: s.deckId ?? '',
+    mode: s.mode,
+    queue: s.queue,
+    currentIndex: s.currentIndex,
+    correctCount: s.correctCount,
+    wrongCount: s.wrongCount,
+    startTime: s.startTime ?? 0,
+  });
+}
+
 // 移除 sessionStorage 中的会话
 function clearSession() {
   try {
@@ -110,16 +123,9 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
         error: null,
       };
       set(next);
-      saveSession({
-        deckId,
-        mode,
-        queue,
-        currentIndex: 0,
-        correctCount: 0,
-        wrongCount: 0,
-        startTime,
-      });
+      persistCurrent(get());
     } catch (e) {
+      console.error('加载复习队列失败', e);
       set({ isLoading: false, error: '加载复习队列失败' });
     }
   },
@@ -141,15 +147,7 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
       return { currentIndex: s.currentIndex + 1, isFlipped: false };
     });
     const s = get();
-    saveSession({
-      deckId: s.deckId ?? '',
-      mode: s.mode,
-      queue: s.queue,
-      currentIndex: s.currentIndex,
-      correctCount: s.correctCount,
-      wrongCount: s.wrongCount,
-      startTime: s.startTime ?? 0,
-    });
+    persistCurrent(s);
   },
 
   // 上一张：已在第一张则不动
@@ -159,30 +157,14 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
       return { currentIndex: s.currentIndex - 1, isFlipped: false };
     });
     const s = get();
-    saveSession({
-      deckId: s.deckId ?? '',
-      mode: s.mode,
-      queue: s.queue,
-      currentIndex: s.currentIndex,
-      correctCount: s.correctCount,
-      wrongCount: s.wrongCount,
-      startTime: s.startTime ?? 0,
-    });
+    persistCurrent(s);
   },
 
   // 跳转到指定索引
   setIndex: (i) => {
     set({ currentIndex: i, isFlipped: false });
     const s = get();
-    saveSession({
-      deckId: s.deckId ?? '',
-      mode: s.mode,
-      queue: s.queue,
-      currentIndex: s.currentIndex,
-      correctCount: s.correctCount,
-      wrongCount: s.wrongCount,
-      startTime: s.startTime ?? 0,
-    });
+    persistCurrent(s);
   },
 
   // 翻转卡片（不持久化）
