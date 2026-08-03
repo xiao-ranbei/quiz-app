@@ -106,7 +106,8 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
         queue,
         currentIndex: 0,
         isFlipped: false,
-        isFinished: queue.length === 0,
+        // 空队列不代表"完成"：页面应显示"今日已完成"空状态，而非完成总结页
+        isFinished: false,
         correctCount: 0,
         wrongCount: 0,
         startTime,

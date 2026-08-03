@@ -120,3 +120,15 @@ describe('闪卡模式音频播放', () => {
     });
   });
 });
+
+describe('空队列状态', () => {
+  it('队列为空时显示“今日已完成”，而不是完成总结页', async () => {
+    cardsMock.fetchStudyQueue.mockResolvedValue([]);
+    renderStudy();
+
+    await waitFor(() => {
+      expect(screen.getByText('今日已完成')).toBeTruthy();
+    });
+    expect(screen.queryByText(/本轮完成/)).toBeNull();
+  });
+});
