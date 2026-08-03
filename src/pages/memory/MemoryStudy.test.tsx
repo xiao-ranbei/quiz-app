@@ -12,6 +12,7 @@ const decksMock = vi.hoisted(() => ({
 }));
 const reviewMock = vi.hoisted(() => ({
   fetchStudyQueue: vi.fn(),
+  submitReviewRpc: vi.fn(),
 }));
 const apkgMock = vi.hoisted(() => ({
   extractAudio: vi.fn(),
@@ -37,6 +38,7 @@ const card: Card = {
 
 beforeEach(() => {
   reviewMock.fetchStudyQueue.mockResolvedValue([card]);
+  reviewMock.submitReviewRpc.mockResolvedValue({});
   decksMock.getDeck.mockResolvedValue({
     id: 'deck1',
     name: '测试牌组',
@@ -133,5 +135,39 @@ describe('空队列状态', () => {
       expect(screen.getByText('今日已完成')).toBeTruthy();
     });
     expect(screen.queryByText(/本轮完成/)).toBeNull();
+  });
+});
+
+describe('选择题模式', () => {
+  it('点击选项后显示结果并可进入下一题', async () => {
+    const fourCards: Card[] = ['ねこ', '犬', '本', '山'].map((front, i) => ({
+      ...card,
+      id: `c${i + 1}`,
+      front,
+      back: `${front}译`,
+    }));
+    reviewMock.fetchStudyQueue.mockResolvedValue(fourCards);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/memory/study/deck1?mode=choice']}>
+        <Routes>
+          <Route path="/memory/study/:deckId" element={<MemoryStudy />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('根据正面选择正确的背面')).toBeTruthy();
+    });
+
+    // 正确选项 = 当前卡片的 back
+    await user.click(screen.getByRole('button', { name: 'ねこ译' }));
+    expect(screen.getByText('✓ 回答正确')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: '下一题' }));
+    await waitFor(() => {
+      expect(screen.getByText('第 2 / 4 张')).toBeTruthy();
+    });
   });
 });
