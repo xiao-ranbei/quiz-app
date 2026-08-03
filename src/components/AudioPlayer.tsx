@@ -41,7 +41,11 @@ export default function AudioPlayer({
     };
   }, [filename]);
 
-  const handleClick = async () => {
+  const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    // 阻止冒泡：音频按钮可能位于可点击的卡片内部（如闪卡翻转卡片），
+    // 避免点击播放时同时触发外层卡片的翻转。
+    e.stopPropagation();
+
     // 已有 URL：直接播放/暂停
     if (url) {
       const audio = audioRef.current;

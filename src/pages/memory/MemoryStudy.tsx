@@ -469,9 +469,17 @@ export default function MemoryStudy() {
         const audioMeta = getCardAudioMeta(current);
         return (
           <>
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="翻转卡片"
               onClick={() => flip()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  flip();
+                }
+              }}
               className="w-full text-left rounded-xl border border-theme bg-theme-card p-8 min-h-[280px] flex flex-col items-center justify-center transition-colors hover:bg-theme-hover cursor-pointer"
             >
               <div className="text-xs text-theme-muted mb-4">
@@ -534,7 +542,7 @@ export default function MemoryStudy() {
                   点击卡片翻转查看答案
                 </div>
               )}
-            </button>
+            </div>
 
             {isFlipped && (
               <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
