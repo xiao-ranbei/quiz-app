@@ -9,6 +9,39 @@ import type {
 } from '../../types';
 import { getCurrentUserId } from './user';
 
+// 聚合 RPC 返回的牌组行（get_memory_home_data / get_memory_profile_data）
+interface MemoryDeckRow {
+  id: string;
+  name: string;
+  description: string | null;
+  lang: string;
+  card_type: string;
+  visibility: string;
+  creator_id?: string | null;
+  total: number;
+  learned: number;
+  mastered: number;
+  dueToday: number;
+  newCards: number;
+}
+
+function parseDeckWithStats(row: MemoryDeckRow): DeckWithStats {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    lang: row.lang as DeckWithStats['lang'],
+    card_type: row.card_type as DeckWithStats['card_type'],
+    visibility: row.visibility as DeckWithStats['visibility'],
+    creator_id: row.creator_id,
+    total: row.total,
+    learned: row.learned,
+    mastered: row.mastered,
+    dueToday: row.dueToday,
+    newCards: row.newCards,
+  };
+}
+
 // ============================================================
 // 聚合统计 RPC + 复习历史 + 最近复习
 // ============================================================
@@ -31,55 +64,14 @@ export async function fetchMemoryHomeData(): Promise<{
 
   const raw = data as unknown as {
     stats: MemoryStats;
-    my_decks: Array<{
-      id: string;
-      name: string;
-      description: string | null;
-      lang: string;
-      card_type: string;
-      visibility: string;
-      total: number;
-      learned: number;
-      mastered: number;
-      dueToday: number;
-      newCards: number;
-    }>;
-    public_decks: Array<{
-      id: string;
-      name: string;
-      description: string | null;
-      lang: string;
-      card_type: string;
-      visibility: string;
-      total: number;
-      learned: number;
-      mastered: number;
-      dueToday: number;
-      newCards: number;
-    }>;
+    my_decks: MemoryDeckRow[];
+    public_decks: MemoryDeckRow[];
   };
-
-  const mapDeck = (row: typeof raw.my_decks[number]): DeckWithStats => ({
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    lang: row.lang as DeckWithStats['lang'],
-    card_type: row.card_type as DeckWithStats['card_type'],
-    visibility: row.visibility as DeckWithStats['visibility'],
-    creator_id: null,
-    created_at: '',
-    updated_at: '',
-    total: row.total,
-    learned: row.learned,
-    mastered: row.mastered,
-    dueToday: row.dueToday,
-    newCards: row.newCards,
-  });
 
   return {
     stats: raw.stats,
-    myDecks: (raw.my_decks ?? []).map(mapDeck),
-    publicDecks: (raw.public_decks ?? []).map(mapDeck),
+    myDecks: (raw.my_decks ?? []).map(parseDeckWithStats),
+    publicDecks: (raw.public_decks ?? []).map(parseDeckWithStats),
   };
 }
 
@@ -148,6 +140,15 @@ export async function getRecentReviews(limit = 20): Promise<RecentReview[]> {
   const userId = await getCurrentUserId();
   if (!userId) return [];
 
+  interface ReviewWithCard {
+    id: string;
+    card_id: string;
+    mode: string;
+    quality: number;
+    reviewed_at: string;
+    cards?: { id: string; front: string; back: string } | null;
+  }
+
   const { data, error } = await supabase
     .from('card_reviews')
     .select('id, card_id, mode, quality, reviewed_at, cards!card_reviews_card_id_fkey(id, front, back)')
@@ -185,11 +186,11 @@ export async function getRecentReviews(limit = 20): Promise<RecentReview[]> {
     }));
   }
 
-  return (data ?? []).map((r) => ({
+  return ((data ?? []) as unknown as ReviewWithCard[]).map((r) => ({
     id: r.id,
     card_id: r.card_id,
-    front: (r as any).cards?.front ?? '',
-    back: (r as any).cards?.back ?? '',
+    front: r.cards?.front ?? '',
+    back: r.cards?.back ?? '',
     mode: r.mode as ReviewMode,
     quality: r.quality,
     reviewed_at: r.reviewed_at,
@@ -226,31 +227,14 @@ export async function fetchMemoryProfileData(
     if (!error && data) {
       const raw = data as unknown as {
         stats: MemoryStats;
-        my_decks: DeckWithStats[];
+        my_decks: MemoryDeckRow[];
         review_history: ReviewHistoryItem[];
         recent_reviews: RecentReview[];
       };
 
-      const mapDeck = (row: any): DeckWithStats => ({
-        id: row.id,
-        name: row.name,
-        description: row.description,
-        lang: row.lang as DeckWithStats['lang'],
-        card_type: row.card_type as DeckWithStats['card_type'],
-        visibility: row.visibility as DeckWithStats['visibility'],
-        creator_id: null,
-        created_at: '',
-        updated_at: '',
-        total: row.total,
-        learned: row.learned,
-        mastered: row.mastered,
-        dueToday: row.dueToday,
-        newCards: row.newCards,
-      });
-
       return {
         stats: raw.stats,
-        myDecks: (raw.my_decks ?? []).map(mapDeck),
+        myDecks: (raw.my_decks ?? []).map(parseDeckWithStats),
         reviewHistory: raw.review_history ?? [],
         recentReviews: raw.recent_reviews ?? [],
       };
@@ -296,18 +280,39 @@ export async function fetchDeckDetailData(
     p_search: search ?? null,
   });
   if (error) throw error;
-  const raw = data as any;
+  const raw = data as unknown as {
+    deck: {
+      id: string;
+      name: string;
+      description: string | null;
+      lang: string;
+      card_type: string;
+      visibility: string;
+      creator_id: string | null;
+      created_at: string;
+      updated_at?: string;
+    } | null;
+    stats: {
+      total: number;
+      learned: number;
+      mastered: number;
+      dueToday: number;
+      newCards: number;
+    } | null;
+    reviewHistory: ReviewHistoryItem[] | null;
+    cards: { data: import('../../types').Card[]; total: number } | null;
+  };
   return {
     deck: raw.deck ? {
       id: raw.deck.id,
       name: raw.deck.name,
       description: raw.deck.description,
-      lang: raw.deck.lang,
-      card_type: raw.deck.card_type,
-      visibility: raw.deck.visibility,
+      lang: raw.deck.lang as Deck['lang'],
+      card_type: raw.deck.card_type as Deck['card_type'],
+      visibility: raw.deck.visibility as Deck['visibility'],
       creator_id: raw.deck.creator_id,
       created_at: raw.deck.created_at,
-      updated_at: raw.deck.updated_at,
+      ...(raw.deck.updated_at ? { updated_at: raw.deck.updated_at } : {}),
     } : null,
     stats: {
       total: raw.stats?.total ?? 0,

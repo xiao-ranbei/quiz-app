@@ -152,7 +152,7 @@ export interface Deck {
   creator_id: string | null;
   metadata?: DeckMetadata;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 // 卡片
@@ -163,8 +163,8 @@ export interface Card {
   back: string;
   metadata: CardMetadata;
   tags: string[];
-  creator_id: string | null;
-  created_at: string;
+  creator_id?: string | null;
+  created_at?: string;
 }
 
 // 用户调度状态（SM-2）
@@ -246,10 +246,10 @@ export interface DeckWithStats {
   lang: Lang;
   card_type: CardType;
   visibility: Visibility;
-  creator_id: string | null;
+  creator_id?: string | null;
   metadata?: DeckMetadata;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   total: number;
   learned: number;
   mastered: number;

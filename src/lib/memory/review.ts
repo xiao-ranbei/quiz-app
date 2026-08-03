@@ -41,8 +41,6 @@ export async function fetchStudyQueue(
     back: c.back,
     metadata: (c.metadata ?? {}) as Card['metadata'],
     tags: c.tags ?? [],
-    creator_id: null,
-    created_at: '',
   }));
 }
 
