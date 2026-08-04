@@ -16,6 +16,7 @@ import JSZip from 'jszip';
 import initSqlJs, { type SqlJsStatic } from 'sql.js';
 import { supabase } from './supabase';
 import { useAuthStore } from '../store/authStore';
+import { getDeck } from './memory/decks';
 
 export interface ApkgImportResult {
   success: boolean;
@@ -176,6 +177,35 @@ function stripSoundTags(text: string): string {
   return text.replace(/\[sound:[^\]]+\]/g, '').trim();
 }
 
+/**
+ * 读取 apkg 内的 media 文件并反转为 { filename: mediaKey }
+ */
+async function readMediaMap(zip: JSZip): Promise<Record<string, string>> {
+  const mediaFile = zip.file('media');
+  if (!mediaFile) return {};
+  try {
+    const mediaText = await mediaFile.async('text');
+    const mediaObj = JSON.parse(mediaText) as Record<string, string>;
+    return Object.fromEntries(
+      Object.entries(mediaObj).map(([idx, name]) => [name, idx]),
+    );
+  } catch (e) {
+    console.warn('[apkg-import] media 文件解析失败:', e);
+    return {};
+  }
+}
+
+/**
+ * 仅加载 apkg 的 zip 与 media_map（修复音频用，不做 SQLite 解析）
+ */
+export async function loadApkgMedia(
+  file: File | Blob,
+): Promise<{ zip: JSZip; mediaMap: Record<string, string> }> {
+  const zip = await JSZip.loadAsync(file);
+  const mediaMap = await readMediaMap(zip);
+  return { zip, mediaMap };
+}
+
 /** sql.js 单例（避免重复加载 wasm） */
 let sqlJsPromise: Promise<SqlJsStatic> | null = null;
 
@@ -216,27 +246,15 @@ async function parseApkg(
 ): Promise<{
   decks: ParsedDeck[];
   mediaMap: Record<string, string>;
+  zip: JSZip;
 }> {
   onProgress?.('unpacking', '正在解压 .apkg 文件...');
 
   // 1. 用 JSZip 解压
   const zip = await JSZip.loadAsync(file);
 
-  // 2. 读取 media 文件
-  const mediaFile = zip.file('media');
-  let mediaMap: Record<string, string> = {};
-  if (mediaFile) {
-    try {
-      const mediaText = await mediaFile.async('text');
-      const mediaObj = JSON.parse(mediaText) as Record<string, string>;
-      // 反转：{ filename: mediaKey }
-      mediaMap = Object.fromEntries(
-        Object.entries(mediaObj).map(([idx, name]) => [name, idx]),
-      );
-    } catch (e) {
-      console.warn('[apkg-import] media 文件解析失败:', e);
-    }
-  }
+  // 2. 读取 media 文件（反转：{ filename: mediaKey }）
+  const mediaMap = await readMediaMap(zip);
 
   // 3. 读取 SQLite 数据库文件
   const dbFile = zip.file('collection.anki21') ?? zip.file('collection.anki2');
@@ -376,7 +394,7 @@ async function parseApkg(
       }
     }
 
-    return { decks: parsedDecks, mediaMap };
+    return { decks: parsedDecks, mediaMap, zip };
   } finally {
     db.close();
   }
@@ -403,13 +421,38 @@ export async function importApkg(
   if (!userId) throw new Error('未登录，无法导入');
 
   // 1. 前端解析 .apkg
-  const { decks: parsedDecks, mediaMap } = await parseApkg(file, onProgress);
+  const { decks: parsedDecks, mediaMap, zip } = await parseApkg(file, onProgress);
 
   if (parsedDecks.length === 0) {
     throw new Error('未找到任何可导入的牌组');
   }
 
-  // 2. 上传原始 .apkg 到 Storage（供 extract-audio 按需提取音频）
+  // 2. 提取实际用到的音频并上传到 audio-cache（播放不再依赖原始 apkg）
+  const usedAudio = collectUsedAudio(parsedDecks);
+  if (usedAudio.length > 0) {
+    onProgress?.('uploading', `正在上传音频（0/${usedAudio.length}）...`);
+    const audioResult = await extractAndUploadAudio(
+      zip,
+      mediaMap,
+      usedAudio,
+      userId,
+      (done, total, current) => {
+        onProgress?.(
+          'uploading',
+          `正在上传音频 ${done}/${total}${current ? `：${current}` : ''}`,
+        );
+      },
+    );
+    if (audioResult.failed.length > 0) {
+      throw new Error(
+        `音频上传失败（${audioResult.failed.length} 个）：` +
+          audioResult.failed.slice(0, 3).join('、') +
+          (audioResult.failed.length > 3 ? ' 等' : ''),
+      );
+    }
+  }
+
+  // 3. 上传原始 .apkg 到 Storage（供 extract-audio 按需提取音频）
   onProgress?.('uploading', `正在上传原始文件 ${file.name}...`);
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const objectPath = `${userId}/${Date.now()}-${safeName}`;
@@ -441,7 +484,7 @@ export async function importApkg(
     if (uploadErr) throw new Error('上传文件失败: ' + uploadErr.message);
   }
 
-  // 3. 调用 Edge Function 写入数据库
+  // 4. 调用 Edge Function 写入数据库
   onProgress?.('importing', `正在写入 ${parsedDecks.length} 个牌组到数据库...`);
   const { data, error } = await supabase.functions.invoke('import-apkg', {
     body: {
@@ -471,6 +514,158 @@ export async function importApkg(
 
 // 模块级缓存：deckId:filename → URL，避免同一会话内重复请求
 const audioUrlCache = new Map<string, string>();
+
+// 支持上传到 audio-cache 的音频扩展名 → MIME（与 bucket allowed_mime_types 一致）
+const AUDIO_MIME: Record<string, string> = {
+  mp3: 'audio/mpeg',
+  m4a: 'audio/m4a',
+  aac: 'audio/aac',
+  ogg: 'audio/ogg',
+  wav: 'audio/wav',
+};
+
+function inferAudioMime(filename: string): string | null {
+  const ext = filename.toLowerCase().split('.').pop() ?? '';
+  return AUDIO_MIME[ext] ?? null;
+}
+
+/**
+ * 收集卡片 metadata 中实际用到的音频文件名（去重，保持顺序）
+ */
+export function collectUsedAudio(
+  decks: Array<{ cards: Array<{ metadata: Record<string, unknown> }> }>,
+): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const deck of decks) {
+    for (const card of deck.cards) {
+      for (const key of ['audio', 'example_audio']) {
+        const v = card.metadata[key];
+        if (typeof v === 'string' && v && !seen.has(v)) {
+          seen.add(v);
+          result.push(v);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+export interface AudioUploadResult {
+  uploaded: number;
+  skipped: number;
+  failed: string[];
+}
+
+/**
+ * 按 media_map 从 zip 中提取音频并上传到 audio-cache/{userId}/{filename}
+ * - 已存在（"already exists"）跳过
+ * - 其余失败记入 failed，由调用方决定中止或提示
+ */
+export async function extractAndUploadAudio(
+  zip: JSZip,
+  mediaMap: Record<string, string>,
+  filenames: string[],
+  userId: string,
+  onProgress?: (done: number, total: number, current: string) => void,
+): Promise<AudioUploadResult> {
+  const total = filenames.length;
+  let uploaded = 0;
+  let skipped = 0;
+  const failed: string[] = [];
+
+  for (let i = 0; i < total; i++) {
+    const filename = filenames[i];
+    onProgress?.(i, total, filename);
+
+    const mediaKey = mediaMap[filename];
+    if (mediaKey === undefined) {
+      failed.push(filename);
+      continue;
+    }
+    const entry = zip.file(mediaKey);
+    if (!entry) {
+      failed.push(filename);
+      continue;
+    }
+    const mime = inferAudioMime(filename);
+    if (!mime) {
+      failed.push(filename);
+      continue;
+    }
+
+    const bytes = await entry.async('uint8array');
+    const { error } = await supabase.storage
+      .from('audio-cache')
+      .upload(`${userId}/${filename}`, bytes, {
+        contentType: mime,
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      if (error.message.includes('already exists')) {
+        skipped += 1;
+      } else {
+        failed.push(filename);
+      }
+    } else {
+      uploaded += 1;
+    }
+  }
+
+  onProgress?.(total, total, '');
+  return { uploaded, skipped, failed };
+}
+
+/**
+ * 分页读取牌组所有卡片 metadata 中的音频文件名（修复音频用）
+ */
+async function fetchDeckUsedAudio(deckId: string): Promise<string[]> {
+  const filenames = new Set<string>();
+  let from = 0;
+  const pageSize = 1000;
+
+  for (;;) {
+    const { data, error } = await supabase
+      .from('cards')
+      .select('metadata')
+      .eq('deck_id', deckId)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+
+    const rows = (data ?? []) as Array<{
+      metadata: Record<string, unknown> | null;
+    }>;
+    for (const row of rows) {
+      for (const key of ['audio', 'example_audio']) {
+        const v = row.metadata?.[key];
+        if (typeof v === 'string' && v) filenames.add(v);
+      }
+    }
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return Array.from(filenames);
+}
+
+/**
+ * 为已导入的牌组修复音频缓存（选择同一个 apkg 文件，不新建牌组）
+ * 音频会补齐到 audio-cache/{userId}/{filename}，数据库与牌组结构不变。
+ */
+export async function repairDeckAudio(
+  deckId: string,
+  file: File,
+  onProgress?: (done: number, total: number, current: string) => void,
+): Promise<AudioUploadResult> {
+  const userId = useAuthStore.getState().user?.id;
+  if (!userId) throw new Error('未登录，无法修复音频');
+
+  const { zip, mediaMap } = await loadApkgMedia(file);
+  const usedAudio = await fetchDeckUsedAudio(deckId);
+  return extractAndUploadAudio(zip, mediaMap, usedAudio, userId, onProgress);
+}
 
 /**
  * 获取牌组的 media_map
@@ -504,18 +699,15 @@ export async function extractAudio(
   const cached = audioUrlCache.get(cacheKey);
   if (cached) return cached;
 
-  const { data, error } = await supabase.functions.invoke('extract-audio', {
-    body: { deckId, filename },
-  });
+  // 音频在导入时已上传到 audio-cache/{creator_id}/{filename}
+  const deck = await getDeck(deckId);
+  const ownerId = deck?.creator_id ?? useAuthStore.getState().user?.id;
+  if (!ownerId) throw new Error('无法确定音频缓存目录');
 
-  if (error) {
-    throw new Error('提取音频失败: ' + error.message);
-  }
-  if (!data?.url) {
-    throw new Error('未返回音频 URL');
-  }
-
-  const url = data.url as string;
+  const { data } = supabase.storage
+    .from('audio-cache')
+    .getPublicUrl(`${ownerId}/${filename}`);
+  const url = data.publicUrl;
   audioUrlCache.set(cacheKey, url);
   return url;
 }

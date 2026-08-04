@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, FileAudio, Pencil, Plus, Trash2, X } from 'lucide-react';
 import {
   LANG_LABEL,
   CARD_TYPE_LABEL,
@@ -23,6 +23,7 @@ import {
 import { deleteCard } from '../../lib/memory/cards';
 import { fetchDeckDetailData } from '../../lib/memory/stats';
 import { isCurrentUserAdmin } from '../../lib/questions';
+import { repairDeckAudio } from '../../lib/apkg-import';
 import { useAuthStore } from '../../store/authStore';
 import Loading from '../../components/Loading';
 import EmptyState from '../../components/EmptyState';
@@ -179,6 +180,11 @@ export default function DeckDetail() {
   const [deletingDeck, setDeletingDeck] = useState(false);
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // 修复音频：仅 apkg 导入的牌组显示（metadata 来自 getDeck，RPC 不含该字段）
+  const [deckMeta, setDeckMeta] = useState<{ source?: string } | null>(null);
+  const [repairing, setRepairing] = useState(false);
+  const [repairProgress, setRepairProgress] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 权限判断：创建者或管理员可管理
   const isOwner = deck?.creator_id === user?.id;
@@ -199,8 +205,9 @@ export default function DeckDetail() {
     Promise.all([
       fetchDeckDetailData(id, page, PAGE_SIZE, debouncedKeyword || undefined),
       isCurrentUserAdmin(),
+      getDeck(id),
     ])
-      .then(([detail, admin]) => {
+      .then(([detail, admin, fullDeck]) => {
         const { deck: d, stats: s, reviewHistory: h, cards: { data, total: t } } = detail;
         setDeck(d);
         setStats(s);
@@ -208,6 +215,7 @@ export default function DeckDetail() {
         setCards(data);
         setTotal(t);
         setIsAdmin(admin);
+        setDeckMeta(fullDeck?.metadata ?? null);
         if (!d) setLoadError('牌组不存在或无权访问');
       })
       .catch((e) => {
@@ -287,6 +295,35 @@ export default function DeckDetail() {
       setMsg({ ok: false, text: e instanceof Error ? e.message : '删除失败' });
     } finally {
       setDeletingCardId(null);
+    }
+  };
+
+  // 修复音频：选择原 apkg，把缺失的音频补齐到 audio-cache，不新建牌组
+  const handleRepairAudio = async (file: File) => {
+    if (!id) return;
+    setRepairing(true);
+    setRepairProgress(null);
+    setMsg(null);
+    try {
+      const result = await repairDeckAudio(id, file, (done, total, current) => {
+        setRepairProgress(
+          `正在上传音频 ${done}/${total}${current ? `：${current}` : ''}`,
+        );
+      });
+      const failText =
+        result.failed.length > 0 ? `，失败 ${result.failed.length} 个` : '';
+      setMsg({
+        ok: true,
+        text: `音频修复完成：新上传 ${result.uploaded} 个，跳过 ${result.skipped} 个${failText}`,
+      });
+    } catch (e) {
+      setMsg({
+        ok: false,
+        text: e instanceof Error ? e.message : '音频修复失败',
+      });
+    } finally {
+      setRepairing(false);
+      setRepairProgress(null);
     }
   };
 
@@ -381,6 +418,11 @@ export default function DeckDetail() {
           {msg.text}
         </div>
       )}
+      {repairProgress && (
+        <div className="mb-4 text-sm text-brand-600 dark:text-brand-300">
+          {repairProgress}
+        </div>
+      )}
 
       {/* ============ SubTask 8.2: 顶部牌组信息卡 ============ */}
       <section className="rounded-xl bg-theme-card border border-theme p-5 mb-6">
@@ -434,6 +476,30 @@ export default function DeckDetail() {
           <div className="flex items-center gap-2 shrink-0">
             {canManage && (
               <>
+                {deckMeta?.source === 'apkg' && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".apkg"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleRepairAudio(f);
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={repairing}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md border border-theme text-theme-secondary hover:bg-theme-hover disabled:opacity-60"
+                      title="旧版导入的牌组音频需选择原 apkg 文件补齐"
+                    >
+                      <FileAudio className="w-4 h-4" />
+                      {repairing ? '修复中...' : '修复音频'}
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => setEditingDeck(true)}
                   className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md border border-theme text-theme-secondary hover:bg-theme-hover"
