@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useModeStore } from '../store/modeStore';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -15,7 +16,12 @@ export default function Login() {
 
   useEffect(() => {
     if (user) {
-      navigate('/', { replace: true });
+      // 按当前模式跳转到对应首页，保证页面与导航栏一致；
+      // 未选过模式则回欢迎页选模式
+      const mode = useModeStore.getState().mode;
+      const target =
+        mode === 'memory' ? '/memory' : mode === 'quiz' ? '/' : '/welcome';
+      navigate(target, { replace: true });
     }
   }, [user, navigate]);
 
