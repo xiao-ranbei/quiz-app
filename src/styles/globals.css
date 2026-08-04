@@ -28,31 +28,31 @@
     --border-strong: #cbd5e1;
     --hover-bg: #f1f5f9;
     /* 默认（刷题模式）品牌紫色板 */
-    --brand-50: #f5f3ff;
-    --brand-100: #ede9fe;
-    --brand-200: #ddd6fe;
-    --brand-300: #c4b5fd;
-    --brand-400: #a78bfa;
-    --brand-500: #8b5cf6;
-    --brand-600: #7c3aed;
-    --brand-700: #6d28d9;
-    --brand-800: #5b21b6;
-    --brand-900: #4c1d95;
-    --brand-accent: var(--brand-700);
+    --brand-50: 245 243 255;
+    --brand-100: 237 233 254;
+    --brand-200: 221 214 254;
+    --brand-300: 196 181 253;
+    --brand-400: 167 139 250;
+    --brand-500: 139 92 246;
+    --brand-600: 124 58 237;
+    --brand-700: 109 40 217;
+    --brand-800: 91 33 182;
+    --brand-900: 76 29 149;
+    --brand-accent: rgb(var(--brand-700));
   }
 
   /* 背诵模式：品牌色板切换为 emerald 绿 */
   :root[data-mode='memory'] {
-    --brand-50: #ecfdf5;
-    --brand-100: #d1fae5;
-    --brand-200: #a7f3d0;
-    --brand-300: #6ee7b7;
-    --brand-400: #34d399;
-    --brand-500: #10b981;
-    --brand-600: #059669;
-    --brand-700: #047857;
-    --brand-800: #065f46;
-    --brand-900: #064e3b;
+    --brand-50: 236 253 245;
+    --brand-100: 209 250 229;
+    --brand-200: 167 243 208;
+    --brand-300: 110 231 183;
+    --brand-400: 52 211 153;
+    --brand-500: 16 185 129;
+    --brand-600: 5 150 105;
+    --brand-700: 4 120 87;
+    --brand-800: 6 95 70;
+    --brand-900: 6 78 59;
   }
 
   /* 深色主题（切换时覆盖） */
@@ -67,7 +67,7 @@
     --border-color: #334155;
     --border-strong: #475569;
     --hover-bg: #1e293b;
-    --brand-accent: var(--brand-400);
+    --brand-accent: rgb(var(--brand-400));
   }
 
   body {
