@@ -6,11 +6,6 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    // 兼容旧的自运行断言脚本（非 vitest 套件）
-    exclude: [
-      '**/node_modules/**',
-      'src/lib/cache.test.ts',
-      'src/lib/sm2.test.ts',
-    ],
+    exclude: ['**/node_modules/**'],
   },
 });

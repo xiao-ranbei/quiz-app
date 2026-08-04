@@ -7,15 +7,19 @@ import { useMemoryStore } from '../../store/memoryStore';
 import type { Card } from '../../types';
 
 // Mock 数据源，避免真实网络请求
-const cardsMock = vi.hoisted(() => ({
-  fetchStudyQueue: vi.fn(),
+const decksMock = vi.hoisted(() => ({
   getDeck: vi.fn(),
+}));
+const reviewMock = vi.hoisted(() => ({
+  fetchStudyQueue: vi.fn(),
+  submitReviewRpc: vi.fn(),
 }));
 const apkgMock = vi.hoisted(() => ({
   extractAudio: vi.fn(),
 }));
 
-vi.mock('../../lib/cards', () => cardsMock);
+vi.mock('../../lib/memory/decks', () => decksMock);
+vi.mock('../../lib/memory/review', () => reviewMock);
 vi.mock('../../lib/apkg-import', () => apkgMock);
 
 const card: Card = {
@@ -33,8 +37,9 @@ const card: Card = {
 };
 
 beforeEach(() => {
-  cardsMock.fetchStudyQueue.mockResolvedValue([card]);
-  cardsMock.getDeck.mockResolvedValue({
+  reviewMock.fetchStudyQueue.mockResolvedValue([card]);
+  reviewMock.submitReviewRpc.mockResolvedValue({});
+  decksMock.getDeck.mockResolvedValue({
     id: 'deck1',
     name: '测试牌组',
     description: null,
@@ -94,7 +99,7 @@ describe('闪卡模式音频播放', () => {
         example_audio: 'example.mp3',
       },
     };
-    cardsMock.fetchStudyQueue.mockResolvedValue([cardWithExample]);
+    reviewMock.fetchStudyQueue.mockResolvedValue([cardWithExample]);
 
     const user = userEvent.setup();
     renderStudy();
@@ -117,6 +122,52 @@ describe('闪卡模式音频播放', () => {
     await waitFor(() => {
       expect(apkgMock.extractAudio).toHaveBeenCalledWith('deck1', 'example.mp3');
       expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalled();
+    });
+  });
+});
+
+describe('空队列状态', () => {
+  it('队列为空时显示“今日已完成”，而不是完成总结页', async () => {
+    reviewMock.fetchStudyQueue.mockResolvedValue([]);
+    renderStudy();
+
+    await waitFor(() => {
+      expect(screen.getByText('今日已完成')).toBeTruthy();
+    });
+    expect(screen.queryByText(/本轮完成/)).toBeNull();
+  });
+});
+
+describe('选择题模式', () => {
+  it('点击选项后显示结果并可进入下一题', async () => {
+    const fourCards: Card[] = ['ねこ', '犬', '本', '山'].map((front, i) => ({
+      ...card,
+      id: `c${i + 1}`,
+      front,
+      back: `${front}译`,
+    }));
+    reviewMock.fetchStudyQueue.mockResolvedValue(fourCards);
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/memory/study/deck1?mode=choice']}>
+        <Routes>
+          <Route path="/memory/study/:deckId" element={<MemoryStudy />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('根据正面选择正确的背面')).toBeTruthy();
+    });
+
+    // 正确选项 = 当前卡片的 back
+    await user.click(screen.getByRole('button', { name: 'ねこ译' }));
+    expect(screen.getByText('✓ 回答正确')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: '下一题' }));
+    await waitFor(() => {
+      expect(screen.getByText('第 2 / 4 张')).toBeTruthy();
     });
   });
 });

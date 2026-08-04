@@ -1,14 +1,9 @@
 import { create } from 'zustand';
 import { Card, ReviewMode } from '../types';
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// 降级方案：若 RPC API 不可用，可回退到 getTodayReviewQueue / submitReview
 import {
   fetchStudyQueue,
   submitReviewRpc,
-  getTodayReviewQueue as _getTodayReviewQueueLegacy,
-  submitReview as _submitReviewApiLegacy,
-} from '../lib/cards';
-/* eslint-enable @typescript-eslint/no-unused-vars */
+} from '../lib/memory/review';
 import { toast } from './toastStore';
 
 const SESSION_KEY = 'memory-study-session';
@@ -72,6 +67,19 @@ function readSession(): SessionPayload | null {
   }
 }
 
+// 将当前 store 状态持久化到 sessionStorage
+function persistCurrent(s: MemoryStudyState) {
+  saveSession({
+    deckId: s.deckId ?? '',
+    mode: s.mode,
+    queue: s.queue,
+    currentIndex: s.currentIndex,
+    correctCount: s.correctCount,
+    wrongCount: s.wrongCount,
+    startTime: s.startTime ?? 0,
+  });
+}
+
 // 移除 sessionStorage 中的会话
 function clearSession() {
   try {
@@ -106,7 +114,8 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
         queue,
         currentIndex: 0,
         isFlipped: false,
-        isFinished: queue.length === 0,
+        // 空队列不代表"完成"：页面应显示"今日已完成"空状态，而非完成总结页
+        isFinished: false,
         correctCount: 0,
         wrongCount: 0,
         startTime,
@@ -114,16 +123,9 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
         error: null,
       };
       set(next);
-      saveSession({
-        deckId,
-        mode,
-        queue,
-        currentIndex: 0,
-        correctCount: 0,
-        wrongCount: 0,
-        startTime,
-      });
+      persistCurrent(get());
     } catch (e) {
+      console.error('加载复习队列失败', e);
       set({ isLoading: false, error: '加载复习队列失败' });
     }
   },
@@ -145,15 +147,7 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
       return { currentIndex: s.currentIndex + 1, isFlipped: false };
     });
     const s = get();
-    saveSession({
-      deckId: s.deckId ?? '',
-      mode: s.mode,
-      queue: s.queue,
-      currentIndex: s.currentIndex,
-      correctCount: s.correctCount,
-      wrongCount: s.wrongCount,
-      startTime: s.startTime ?? 0,
-    });
+    persistCurrent(s);
   },
 
   // 上一张：已在第一张则不动
@@ -163,30 +157,14 @@ export const useMemoryStore = create<MemoryStudyStore>((set, get) => ({
       return { currentIndex: s.currentIndex - 1, isFlipped: false };
     });
     const s = get();
-    saveSession({
-      deckId: s.deckId ?? '',
-      mode: s.mode,
-      queue: s.queue,
-      currentIndex: s.currentIndex,
-      correctCount: s.correctCount,
-      wrongCount: s.wrongCount,
-      startTime: s.startTime ?? 0,
-    });
+    persistCurrent(s);
   },
 
   // 跳转到指定索引
   setIndex: (i) => {
     set({ currentIndex: i, isFlipped: false });
     const s = get();
-    saveSession({
-      deckId: s.deckId ?? '',
-      mode: s.mode,
-      queue: s.queue,
-      currentIndex: s.currentIndex,
-      correctCount: s.correctCount,
-      wrongCount: s.wrongCount,
-      startTime: s.startTime ?? 0,
-    });
+    persistCurrent(s);
   },
 
   // 翻转卡片（不持久化）
