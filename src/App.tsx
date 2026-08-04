@@ -17,6 +17,7 @@ import AddCard from './pages/memory/AddCard';
 import { initAuth } from './store/authStore';
 import ToastContainer from './components/Toast';
 import { useModeStore } from './store/modeStore';
+import { applyModeToDocument } from './lib/theme';
 
 // 落地页路径：这些页面不显示 Navbar 和 footer，作为独立的全屏落地体验
 const LANDING_PATHS = new Set(['/welcome', '/login']);
@@ -25,6 +26,11 @@ function AppShell() {
   const { mode } = useModeStore();
   const location = useLocation();
   const isLanding = LANDING_PATHS.has(location.pathname);
+
+  // 模式变化时同步全局色系（覆盖 Welcome 选择与 ModeSwitch 切换）
+  useEffect(() => {
+    applyModeToDocument(mode);
+  }, [mode]);
 
   return (
     <div className="min-h-screen bg-theme-primary text-theme-primary">

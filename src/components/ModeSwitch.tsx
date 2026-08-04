@@ -21,7 +21,7 @@ export default function ModeSwitch() {
   return (
     <button
       onClick={handleToggle}
-      className="p-2 rounded-md transition-colors text-theme-secondary hover:text-theme-primary hover:bg-theme-hover"
+      className="p-2 rounded-md transition-colors text-brand-600 dark:text-brand-300 hover:bg-theme-hover"
       title={mode === 'quiz' ? '切换到背诵模式' : '切换到刷题模式'}
     >
       {mode === 'quiz' ? <Brain className="w-5 h-5" /> : <ClipboardList className="w-5 h-5" />}

@@ -8,12 +8,17 @@
       // 默认深色主题；用户选择过则使用用户选择
       (function () {
         const saved = localStorage.getItem('theme');
+        const savedMode = localStorage.getItem('app-mode');
         const root = document.documentElement;
         if (saved === 'light') {
           root.classList.remove('dark');
         } else {
           // 默认深色
           root.classList.add('dark');
+        }
+        // 按已选模式预置 data-mode，避免刷新时品牌色闪变（默认紫色）
+        if (savedMode === 'quiz' || savedMode === 'memory') {
+          root.dataset.mode = savedMode;
         }
       })();
     </script>
